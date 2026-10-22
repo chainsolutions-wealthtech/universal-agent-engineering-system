@@ -22,18 +22,19 @@ class EffectCoordinator:
               AND m.scope=t.action AND m.revoked=0 AND m.expires>?""",
               (task_id,agent_id,mandate_id,fencing,now,agent_id,now)).fetchone()
             if not row: raise PermissionError("task claim or mandate not effective")
-            # A savepoint permits the existing journal transaction to be nested safely.
+            eid=self.journal.prepare(task_id,target,operation,key)
+            existing=self.engine.db.execute(
+                "SELECT task_id,agent_id,mandate_id,fencing FROM effect_bindings WHERE effect_id=?",(eid,)).fetchone()
+            if existing and existing!=(task_id,agent_id,mandate_id,fencing):
+                raise PermissionError("idempotency key bound to another claim")
+            self.engine.db.execute(
+                "INSERT OR IGNORE INTO effect_bindings VALUES(?,?,?,?,?)",
+                (eid,task_id,agent_id,mandate_id,fencing))
             self.engine.db.execute("COMMIT")
+            return eid
         except Exception:
             self.engine.db.execute("ROLLBACK")
             raise
-        eid=self.journal.prepare(task_id,target,operation,key)
-        existing=self.engine.db.execute("SELECT task_id,agent_id,mandate_id,fencing FROM effect_bindings WHERE effect_id=?",(eid,)).fetchone()
-        if existing and existing!=(task_id,agent_id,mandate_id,fencing):
-            raise PermissionError("idempotency key bound to another claim")
-        self.engine.db.execute("INSERT OR IGNORE INTO effect_bindings VALUES(?,?,?,?,?)",
-                               (eid,task_id,agent_id,mandate_id,fencing))
-        return eid
 
     def completion_gate(self,task_id):
         rows=self.engine.db.execute("""SELECT e.state FROM effects e
