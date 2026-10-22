@@ -100,6 +100,36 @@ class Engine:
             self.db.execute("ROLLBACK")
             raise
 
+    def complete_with_effects(self,task_id,agent_id,fencing,result):
+        """Atomically complete a task only after its bound effects are confirmed."""
+        now=time.time()
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            valid=self.db.execute("""SELECT 1 FROM tasks t JOIN mandates m
+              ON m.id=t.claim_mandate WHERE t.id=? AND t.state='CLAIMED'
+              AND t.claim_owner=? AND t.fencing=? AND t.claim_expiry>?
+              AND m.agent_id=? AND m.project_id=t.project_id AND m.scope=t.action
+              AND m.revoked=0 AND m.expires>?""",
+              (task_id,agent_id,fencing,now,agent_id,now)).fetchone()
+            if not valid: raise PermissionError("stale task, lease or mandate")
+            effects=self.db.execute("""SELECT e.state FROM effects e
+              JOIN effect_bindings b ON e.id=b.effect_id
+              WHERE b.task_id=? AND b.agent_id=? AND b.fencing=?""",
+              (task_id,agent_id,fencing)).fetchall()
+            if not effects or any(x[0]!="CONFIRMED" for x in effects):
+                raise PermissionError("task has unconfirmed or missing effects")
+            other=self.db.execute("""SELECT COUNT(*) FROM effect_bindings
+              WHERE task_id=? AND (agent_id<>? OR fencing<>?)""",
+              (task_id,agent_id,fencing)).fetchone()[0]
+            if other: raise PermissionError("effects from another claim require reconciliation")
+            self.db.execute("UPDATE tasks SET state='DONE', result=? WHERE id=?",
+                            (json.dumps(result,sort_keys=True),task_id))
+            self.event("task.completed",task_id,{"fencing":fencing,"effects":len(effects)})
+            self.db.execute("COMMIT")
+        except Exception:
+            self.db.execute("ROLLBACK")
+            raise
+
     def checkpoint(self):
         return {"events":self.db.execute("SELECT count(*) FROM events").fetchone()[0],
                 "tasks":self.db.execute("SELECT state,count(*) FROM tasks GROUP BY state").fetchall()}
