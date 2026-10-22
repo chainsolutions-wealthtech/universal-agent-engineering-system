@@ -17,6 +17,8 @@ class ReadbackVerifier:
 
     def inspect(self, effect):
         observation=self.adapter.readback(effect["target"],effect["operation"],effect["idempotency_key"])
+        if observation is None:
+            return {"status":"UNKNOWN","requires_reconciliation":True}
         if not isinstance(observation,VerifiedObservation):
             raise PermissionError("adapter did not return a typed observation")
         if (observation.target,observation.operation,observation.idempotency_key)!=(
