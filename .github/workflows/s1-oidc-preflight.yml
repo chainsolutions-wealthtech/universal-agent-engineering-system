@@ -1,0 +1,30 @@
+name: UAES S1 OIDC Preflight
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  oidc-preflight:
+    runs-on: ubuntu-latest
+    environment: uaes-s1-staging
+    permissions:
+      contents: read
+      id-token: write
+    timeout-minutes: 5
+    steps:
+      - name: Verify isolated S1 identity configuration
+        env:
+          AUDIENCE: ${{ vars.UAES_S1_OIDC_AUDIENCE }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$AUDIENCE" || { echo "BLOCKED: UAES_S1_OIDC_AUDIENCE is not configured"; exit 1; }
+          case "$AUDIENCE" in
+            https://*) ;;
+            *) echo "BLOCKED: audience must be an https URL"; exit 1 ;;
+          esac
+          test -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" || { echo "OIDC request service unavailable"; exit 1; }
+          test -n "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" || { echo "OIDC request credential unavailable"; exit 1; }
+          echo "GitHub OIDC request capability present for configured audience"
+          echo "No token is requested, printed, exported, or sent to S1."
+          echo "No SSH session or deployment performed."
