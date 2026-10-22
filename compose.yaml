@@ -1,0 +1,22 @@
+services:
+  uaes-worker:
+    build: .
+    restart: unless-stopped
+    environment:
+      UAES_DB: /data/uaes.sqlite
+      UAES_AGENT_ID: ${UAES_AGENT_ID:?existing agent identity required}
+      UAES_MANDATE_ID: ${UAES_MANDATE_ID:?approved mandate required}
+    volumes:
+      - uaes_data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+volumes:
+  uaes_data:
