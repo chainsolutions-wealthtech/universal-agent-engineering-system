@@ -22,6 +22,17 @@ class CoreTest(unittest.TestCase):
   with self.assertRaises(PermissionError): self.e.claim(t,self.a,"missing")
   self.e.revoke(self.m)
   with self.assertRaises(PermissionError): self.e.claim(t,self.a,self.m)
+ def test_revoked_after_claim_cannot_complete(self):
+  t=self.e.submit("fixture","analyze",{})
+  token=self.e.claim(t,self.a,self.m)
+  self.e.revoke(self.m)
+  with self.assertRaises(PermissionError): self.e.complete(t,self.a,token,{"ok":True})
+  self.assertEqual(self.e.db.execute("SELECT state FROM tasks WHERE id=?",(t,)).fetchone()[0],"CLAIMED")
+ def test_expired_after_claim_cannot_complete(self):
+  t=self.e.submit("fixture","analyze",{})
+  token=self.e.claim(t,self.a,self.m)
+  self.e.db.execute("UPDATE mandates SET expires=0 WHERE id=?",(self.m,))
+  with self.assertRaises(PermissionError): self.e.complete(t,self.a,token,{"ok":True})
  def test_dedupe(self):
   self.e.submit("fixture","analyze",{})
   with self.assertRaises(Exception): self.e.submit("fixture","analyze",{})
