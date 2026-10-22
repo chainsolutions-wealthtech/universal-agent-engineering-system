@@ -33,6 +33,23 @@ class CoreTest(unittest.TestCase):
   token=self.e.claim(t,self.a,self.m)
   self.e.db.execute("UPDATE mandates SET expires=0 WHERE id=?",(self.m,))
   with self.assertRaises(PermissionError): self.e.complete(t,self.a,token,{"ok":True})
+ def test_reclaim_expired_lease_fences_old_worker(self):
+  other=self.e.agent("second")
+  other_mandate=self.e.mandate(other,"fixture","analyze")
+  t=self.e.submit("fixture","analyze",{})
+  first=self.e.claim(t,self.a,self.m)
+  self.e.db.execute("UPDATE tasks SET claim_expiry=0 WHERE id=?",(t,))
+  second=self.e.claim(t,other,other_mandate)
+  self.assertGreater(second,first)
+  with self.assertRaises(PermissionError): self.e.complete(t,self.a,first,{"bad":True})
+  self.e.complete(t,other,second,{"ok":True})
+  self.assertEqual(self.e.db.execute("SELECT count(*) FROM events WHERE kind='task.completed'").fetchone()[0],1)
+ def test_renew_requires_current_lease_and_mandate(self):
+  t=self.e.submit("fixture","analyze",{})
+  token=self.e.claim(t,self.a,self.m)
+  self.e.renew(t,self.a,self.m,token)
+  self.e.revoke(self.m)
+  with self.assertRaises(PermissionError): self.e.renew(t,self.a,self.m,token)
  def test_dedupe(self):
   self.e.submit("fixture","analyze",{})
   with self.assertRaises(Exception): self.e.submit("fixture","analyze",{})
