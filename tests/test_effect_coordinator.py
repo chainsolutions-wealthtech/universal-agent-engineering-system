@@ -34,4 +34,21 @@ class CoordinatorTests(unittest.TestCase):
   f2=self.e.claim(self.t,a2,m2)
   with self.assertRaises(PermissionError):
    self.c.prepare(self.t,a2,m2,f2,"sandbox","create","same-key")
+class AtomicityTests(unittest.TestCase):
+ def test_conflicting_key_rolls_back_without_unbound_effect(self):
+  with tempfile.TemporaryDirectory() as tmp:
+   engine=Engine(Path(tmp)/"db.sqlite")
+   first=engine.agent("first")
+   m1=engine.mandate(first,"project","analyze")
+   task=engine.submit("project","analyze",{})
+   fence=engine.claim(task,first,m1)
+   c=EffectCoordinator(engine)
+   eid=c.prepare(task,first,m1,fence,"target","change","key-1")
+   before=engine.db.execute("SELECT count(*) FROM effects").fetchone()[0]
+   with self.assertRaises(ValueError):
+    c.prepare(task,first,m1,fence,"other-target","change","key-1")
+   self.assertEqual(engine.db.execute("SELECT count(*) FROM effects").fetchone()[0],before)
+   self.assertEqual(engine.db.execute("SELECT count(*) FROM effect_bindings").fetchone()[0],1)
+   self.assertEqual(c.journal.recover(eid)["action"],"AWAIT_AUTHORIZED_DISPATCH")
+   engine.db.close()
 if __name__=="__main__":unittest.main()
