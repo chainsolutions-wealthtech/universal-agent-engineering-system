@@ -80,6 +80,26 @@ class Engine:
         except Exception:
             self.db.execute("ROLLBACK")
             raise
+    def renew(self,task_id,agent_id,mandate_id,fencing,lease=90):
+        """Extend a live claim only while its authorization is still effective."""
+        now=time.time()
+        if lease<=0: raise ValueError("lease must be positive")
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            changed=self.db.execute("""UPDATE tasks SET claim_expiry=? WHERE id=?
+            AND state='CLAIMED' AND claim_owner=? AND claim_mandate=?
+            AND fencing=? AND claim_expiry>?
+            AND EXISTS(SELECT 1 FROM mandates m WHERE m.id=tasks.claim_mandate
+               AND m.agent_id=? AND m.project_id=tasks.project_id
+               AND m.scope=tasks.action AND m.revoked=0 AND m.expires>?)""",
+               (now+lease,task_id,agent_id,mandate_id,fencing,now,agent_id,now)).rowcount
+            if changed!=1: raise PermissionError("cannot renew stale or unauthorized claim")
+            self.event("task.renewed",task_id,{"agent":agent_id,"fencing":fencing})
+            self.db.execute("COMMIT")
+        except Exception:
+            self.db.execute("ROLLBACK")
+            raise
+
     def checkpoint(self):
         return {"events":self.db.execute("SELECT count(*) FROM events").fetchone()[0],
                 "tasks":self.db.execute("SELECT state,count(*) FROM tasks GROUP BY state").fetchall()}
