@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS mandates(id TEXT PRIMARY KEY, agent_id TEXT NOT NULL 
  project_id TEXT NOT NULL, scope TEXT NOT NULL, expires REAL NOT NULL, revoked INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS tasks(id TEXT PRIMARY KEY, project_id TEXT NOT NULL, action TEXT NOT NULL,
  payload TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'READY', claim_owner TEXT,
- claim_expiry REAL, fencing INTEGER NOT NULL DEFAULT 0, result TEXT, UNIQUE(project_id,action));
+ claim_expiry REAL, claim_mandate TEXT, fencing INTEGER NOT NULL DEFAULT 0, result TEXT, UNIQUE(project_id,action));
 CREATE TABLE IF NOT EXISTS events(seq INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL,
  subject TEXT NOT NULL, data TEXT NOT NULL, recorded REAL NOT NULL);
 """
@@ -53,8 +53,8 @@ class Engine:
             if task[2] not in ("READY","CLAIMED") or (task[2]=="CLAIMED" and task[3]>now):
                 raise ValueError("task not claimable")
             token=task[4]+1
-            self.db.execute("UPDATE tasks SET state='CLAIMED',claim_owner=?,claim_expiry=?,fencing=? WHERE id=?",
-                            (agent_id,now+lease,token,task_id))
+            self.db.execute("UPDATE tasks SET state='CLAIMED',claim_owner=?,claim_expiry=?,claim_mandate=?,fencing=? WHERE id=?",
+                            (agent_id,now+lease,mandate_id,token,task_id))
             self.event("task.claimed",task_id,{"agent":agent_id,"fencing":token})
             self.db.execute("COMMIT")
             return token
@@ -65,6 +65,12 @@ class Engine:
         now=time.time()
         self.db.execute("BEGIN IMMEDIATE")
         try:
+            authorization=self.db.execute("""SELECT 1 FROM tasks t JOIN mandates m ON t.claim_mandate=m.id
+              WHERE t.id=? AND t.claim_owner=? AND t.fencing=? AND m.agent_id=?
+              AND m.project_id=t.project_id AND m.scope=t.action
+              AND m.revoked=0 AND m.expires>?""",
+              (task_id,agent_id,fencing,agent_id,now)).fetchone()
+            if not authorization: raise PermissionError("mandate revoked, expired or mismatched")
             updated=self.db.execute("""UPDATE tasks SET state='DONE',result=? WHERE id=? AND state='CLAIMED'
             AND claim_owner=? AND fencing=? AND claim_expiry>?""",
             (json.dumps(result,sort_keys=True),task_id,agent_id,fencing,now)).rowcount
