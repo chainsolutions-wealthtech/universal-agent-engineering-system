@@ -1,0 +1,59 @@
+name: UAES Continuity Dispatch
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 * * * *'
+  issues:
+    types: [opened, edited, closed, reopened]
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_run:
+    workflows: ["Documentation validation"]
+    types: [completed]
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+concurrency:
+  group: uaes-continuity
+  cancel-in-progress: false
+jobs:
+  determine-next:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Observe GitHub and compute evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, os, subprocess
+          from pathlib import Path
+          repo=os.environ["GH_REPO"]
+          def gh(*args):
+            p=subprocess.run(["gh","api",*args],text=True,capture_output=True)
+            if p.returncode:
+              return None
+            try:return json.loads(p.stdout)
+            except json.JSONDecodeError:return None
+          pr=gh(f"repos/{repo}/pulls/1") or {}
+          protection=gh(f"repos/{repo}/branches/main/protection")
+          checks=gh(f"repos/{repo}/commits/{pr.get('head',{}).get('sha','missing')}/check-runs") or {}
+          passed=any(x.get("conclusion")=="success" and x.get("name") in ("documentary-contracts","Documentation validation / documentary-contracts") for x in checks.get("check_runs",[]))
+          reviews=gh(f"repos/{repo}/pulls/1/reviews") or []
+          approved=any(r.get("state")=="APPROVED" and r.get("user",{}).get("login")!=pr.get("user",{}).get("login") for r in reviews)
+          ev={"main_protected":protection is not None,"independent_review_approved":approved,"ci_success_current_head":passed,"permissions_attested":False,"runtime_verified":False}
+          Path("evidence.json").write_text(json.dumps(ev))
+          PY
+      - name: Select next action (read-only)
+        run: UAES_EVIDENCE_FILE=evidence.json python scripts/continuity_engine.py | tee continuity-receipt.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: uaes-continuity-${{ github.run_id }}
+          path: |
+            continuity-receipt.json
+            evidence.json
+          retention-days: 30
