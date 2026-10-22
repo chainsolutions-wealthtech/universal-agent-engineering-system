@@ -11,7 +11,7 @@ class EffectJournal:
           receipt TEXT, created_at REAL NOT NULL, updated_at REAL NOT NULL)""")
     def prepare(self, task_id, target, operation, key):
         now=time.time()
-        self.db.execute("BEGIN IMMEDIATE")
+        self.db.execute("SAVEPOINT effect_prepare")
         try:
             row=self.db.execute("SELECT id,task_id,target,operation FROM effects WHERE idempotency_key=?",(key,)).fetchone()
             if row:
@@ -21,10 +21,11 @@ class EffectJournal:
                 eid=str(uuid.uuid4())
                 self.db.execute("INSERT INTO effects VALUES(?,?,?,?,?,'PREPARED',?,?,?)",
                                 (eid,key,task_id,target,operation,None,now,now))
-            self.db.execute("COMMIT")
+            self.db.execute("RELEASE SAVEPOINT effect_prepare")
             return eid
         except Exception:
-            self.db.execute("ROLLBACK")
+            self.db.execute("ROLLBACK TO SAVEPOINT effect_prepare")
+            self.db.execute("RELEASE SAVEPOINT effect_prepare")
             raise
     def dispatch(self,eid):
         """Mark uncertain BEFORE any external call; safe after crash."""
