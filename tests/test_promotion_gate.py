@@ -21,6 +21,21 @@ class PromotionGateTests(unittest.TestCase):
   case=dict(self.valid)
   del case["required_approving_reviews"]
   self.assertIn("REVIEW_POLICY_UNVERIFIED",assess(case)["failures"])
+ def test_bootstrap_promotion_does_not_require_future_host_but_keeps_policy(self):
+  case=dict(self.valid,promotion_stage="bootstrap",permissions_attested=False,
+            isolated_deployment_ready=False)
+  self.assertTrue(assess(case)["admissible"])
+  case["main_protected"]=False
+  self.assertIn("MAIN_UNPROTECTED",assess(case)["failures"])
+  case=dict(self.valid,promotion_stage="bootstrap",required_approving_reviews=1)
+  self.assertIn("PROVIDER_REVIEW_REQUIRED",assess(case)["failures"])
+ def test_production_gate_still_requires_host_and_app(self):
+  case=dict(self.valid,promotion_stage="production",permissions_attested=False)
+  self.assertIn("INSTALLATION_PERMISSIONS_UNATTESTED",assess(case)["failures"])
+  case=dict(self.valid,promotion_stage="production",isolated_deployment_ready=False)
+  self.assertIn("ISOLATED_RUNTIME_UNVERIFIED",assess(case)["failures"])
+  case=dict(self.valid,promotion_stage="unknown")
+  self.assertIn("PROMOTION_STAGE_UNVERIFIED",assess(case)["failures"])
  def test_missing_checks_fail_closed(self):
   self.assertFalse(assess(dict(self.valid,checks={}))["admissible"])
  def test_failed_check_not_accepted(self):
