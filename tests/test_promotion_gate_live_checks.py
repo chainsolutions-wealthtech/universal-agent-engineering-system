@@ -9,7 +9,7 @@ OLD_SHA = "8cd0932b4ef8b2704c582e509753a01717fe7d45"
 def live_case():
     return {
         "main_protected": True,
-        "independent_approval": True,
+        "required_approving_reviews": 0,
         "draft": False,
         "permissions_attested": True,
         "isolated_deployment_ready": True,
@@ -31,7 +31,7 @@ class LiveGitHubPromotionGateTests(unittest.TestCase):
         for run in case["check_runs"]:
             run["head_sha"] = OLD_SHA
         self.assertFalse(assess(case)["admissible"])
-        self.assertEqual(sum("CHECK_NOT_SUCCESS:" in x for x in assess(case)["failures"]), 4)
+        self.assertEqual(sum("CHECK_NOT_SUCCESS:" in x for x in assess(case)["failures"]), len(REQUIRED_CHECK_JOBS))
 
     def test_unknown_actor_is_not_treated_as_github_actions(self):
         case = live_case()
@@ -63,8 +63,8 @@ class LiveGitHubPromotionGateTests(unittest.TestCase):
         case["main_protected"] = False
         self.assertIn("MAIN_UNPROTECTED", assess(case)["failures"])
         case = live_case()
-        case["independent_approval"] = False
-        self.assertIn("INDEPENDENT_APPROVAL_MISSING", assess(case)["failures"])
+        case["required_approving_reviews"] = 1
+        self.assertIn("PROVIDER_REVIEW_REQUIRED", assess(case)["failures"])
 
 
 if __name__ == "__main__":
