@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "scope": "chainsolutions-wealthtech/universal-agent-engineering-system",
+  "required_bypass_mode": "always",
+  "verification": "REQUIRES_EFFECTIVE_GITHUB_READBACK",
+  "accounts": [
+    {
+      "account_login": "Wealthtechinnovations",
+      "account_id": 94637590,
+      "account_type": "User",
+      "bypass_actor_type": "User",
+      "bypass_actor_id": 94637590,
+      "bypass_mode": "always"
+    },
+    {
+      "account_login": "Patricked-code",
+      "account_id": 270385782,
+      "account_type": "User",
+      "bypass_actor_type": "User",
+      "bypass_actor_id": 270385782,
+      "bypass_mode": "always"
+    },
+    {
+      "account_login": "chainsolutions-wealthtech",
+      "account_id": 299685687,
+      "account_type": "Organization",
+      "bypass_actor_type": "Integration",
+      "app_slug": null,
+      "bypass_actor_id": null,
+      "bypass_mode": "always"
+    }
+  ]
+}
