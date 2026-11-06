@@ -12,6 +12,7 @@ class UnifiedDeliverySequenceTests(unittest.TestCase):
         content = (ROOT / "docs/UNIFIED_DELIVERY_SEQUENCE.md").read_text(encoding="utf-8")
         steps = re.findall(r"^\| (U\d{2}) \|", content, flags=re.MULTILINE)
         self.assertEqual(steps, [f"U{i:02d}" for i in range(12)])
+        self.assertIn("U00_MAIN_RULESET_RUNBOOK.md", content)
 
     def test_historical_roadmaps_remain_and_link_unified_order(self):
         for path, first, last in (
