@@ -1,0 +1,19 @@
+name: UAES Automated Review
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  automated-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Policy and secret-pattern inspection
+        run: python scripts/automated_review.py
+      - name: Run full non-regression suite
+        run: python -m unittest discover -s tests -v
