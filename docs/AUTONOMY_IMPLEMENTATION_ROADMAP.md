@@ -1,5 +1,8 @@
 # Program for end-to-end autonomous delivery
 
+**Unified delivery and real gates:** [UNIFIED_DELIVERY_SEQUENCE.md](UNIFIED_DELIVERY_SEQUENCE.md) sequences P0 repository protection and independent PR #1 review, bootstrap promotion, isolated durable worker, verified GitHub App, cartography, program/task/UTL factory, agent admission, continuous code delivery and optional MCP interoperability. The A00–A12 milestone IDs below are retained; no green CI or planning document constitutes hosted-runtime evidence.
+
+
 All milestones are **PLANNED** unless separately verified by runtime receipts.
 
 | Milestone | Required outcome | Blocking gate |
