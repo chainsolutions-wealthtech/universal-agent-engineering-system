@@ -12,6 +12,7 @@ on:
     types: [completed]
 permissions:
   contents: read
+  checks: read
   issues: read
   pull-requests: read
 concurrency:
