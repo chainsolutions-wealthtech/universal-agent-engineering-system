@@ -12,7 +12,7 @@ branch protections, organizational rules or applicable terms.
 - Required checks on the current PR HEAD from the **GitHub Actions application ID 15368** (observed on 2026-11-06): `core-tests`, `documentary-contracts`, `container-smoke`, `automated-review`, `determine-next`.
 - Required checks use strict up-to-date base policy. For ordinary actors: no deletion or force-push. The three explicitly authorized identities retain an auditable `always` bypass on **this** ruleset; no blanket RepositoryRole or OrganizationAdmin bypass is granted.
 - GitHub identities verified from current API access: `Wealthtechinnovations` (User ID 94637590), `Patricked-code` (User ID 270385782), and `chainsolutions-wealthtech` (Organization ID 299685687). This is three **installation accounts**, not three user logins. The organization's authorized executing principal must be mapped to the exact GitHub App `Integration` installed on UAES; an organization cannot be used as a `User` bypass actor.
-- The discoverable mapping is `state/AUTHORIZED_BYPASS_ACCOUNTS.json`. Its organization GitHub App mapping is intentionally `null` until the App slug/ID and target repository installation are attested. This prevents accidentally restricting any approved actor.
+- The discoverable mapping is `state/AUTHORIZED_BYPASS_ACCOUNTS.json`. The owner-declared candidate GitHub App is `ChainSolutions Universal Gateway`, App ID `5417646`, public URL slug `chainsolutions-universal-gateway`. These values are **candidates only**, not live GitHub App/installation attestations. The installer must verify App ID, slug, organization installation and actual UAES repository access before any write, otherwise stop without altering rights.
 - Organization-level rules cannot be overridden; if there is a real external approval requirement, stop and report that requirement.
 
 ## Safe preparatory execution
@@ -24,7 +24,7 @@ python -m unittest discover -s tests -v
 python scripts/configure_main_ruleset.py
 ```
 
-The second command is a **network-free dry-run**. While the organization's App actor is unresolved, it emits `BLOCKED_NO_RIGHTS_CHANGE` rather than showing or applying an incomplete policy. This is deliberate and does not require routine owner approval.
+The second command is a **network-free dry-run**. A complete syntactic candidate produces `DRY_RUN_ONLY`, **not** a claim of authorized actor identity. With a missing or invalid mapping, it emits `BLOCKED_NO_RIGHTS_CHANGE` rather than applying an incomplete policy. This is deliberate and does not require routine owner approval.
 
 ## Authorized administration and readback
 
@@ -32,7 +32,7 @@ GitHub's `POST /repos/{owner}/{repo}/rulesets` requires an authenticated
 credential with **Repository Administration: write**. A GitHub profile reporting
 `admin=true` does not itself provide that credential to a particular tool.
 
-Once the exact organization App integration is verified, populate the third account's `app_slug` and `bypass_actor_id` in the mapping file on the reviewed branch, then rerun tests. The installer additionally validates all three identities and the App's organization installation/repository access through the provider API, failing closed if evidence is inaccessible.
+The mapping includes only the previously owner-declared App ID and slug as candidates. The installer validates all three identities and the App's organization installation/repository access through the provider API **before creating any rule**, failing closed if evidence is inaccessible or mismatched. Do not substitute the ChatGPT GitHub connector's installation IDs for the ChainSolutions Universal Gateway App's identity.
 
 Once an authorized GitHub administration executor exists, supply its **short-lived**
 token from a protected secret broker as the runtime-only
