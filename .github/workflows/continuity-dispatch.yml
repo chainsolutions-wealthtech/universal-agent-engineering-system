@@ -44,7 +44,7 @@ jobs:
           head=pr.get("head",{}).get("sha","")
           branch=gh(f"repos/{repo}/branches/main") or {}
           protection=gh(f"repos/{repo}/branches/main/protection")
-          rulesets=gh(f"repos/{repo}/rulesets")
+          active_rules=gh(f"repos/{repo}/rules/branches/main")
           checks=gh(f"repos/{repo}/commits/{head}/check-runs") if head else None
           runs=(checks or {}).get("check_runs",[])
           def check_green(job_name):
@@ -55,13 +55,16 @@ jobs:
             latest=max(items,key=lambda x:x["id"])
             return latest.get("status")=="completed" and latest.get("conclusion")=="success"
           required=("core-tests","documentary-contracts","container-smoke","automated-review")
-          # Fail closed on unknown rulesets or branch protection; a GitHub-enforced
-          # approval requirement is never ignored to satisfy owner automation policy.
-          review_policy_verified=(isinstance(protection,dict)
-            and protection.get("required_pull_request_reviews") is None
-            and isinstance(rulesets,list) and not rulesets)
+          # Read the effective rules APPLIED to main, not all repo rulesets.
+          # Missing/unreadable rules are UNKNOWN, never a zero-review attestation.
+          pr_rules=[x for x in active_rules if x.get("type")=="pull_request"] if isinstance(active_rules,list) else []
+          counts=[x.get("parameters",{}).get("required_approving_review_count")
+            for x in pr_rules]
+          review_policy_verified=(branch.get("protected") is True and len(pr_rules)>0
+            and all(type(n) is int and n==0 for n in counts))
           ev={"main_protected":branch.get("protected") is True,
               "review_policy_automated":review_policy_verified,
+              "required_approving_reviews":max(counts) if counts and all(type(n) is int for n in counts) else None,
               "automated_review_passed":check_green("automated-review"),
               "ci_success_current_head":all(check_green(name) for name in required),
               "permissions_attested":False,"runtime_verified":False}
