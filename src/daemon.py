@@ -8,6 +8,21 @@ class Daemon:
   self.db,self.agent,self.mandate,self.interval=db,agent,mandate,interval
   self.stop_event=threading.Event()
   self.stats={"ticks":0,"completed":0,"failures":0,"last_error":None}
+
+ def readiness(self):
+  """Readiness is based on current local authority, not merely configured IDs."""
+  if self.stop_event.is_set() or not self.agent or not self.mandate:
+   return False
+  try:
+   with sqlite3.connect(str(self.db),timeout=3) as db:
+    db.execute("PRAGMA query_only=ON")
+    row=db.execute("""SELECT 1 FROM mandates m JOIN agents a ON a.id=m.agent_id
+      WHERE m.id=? AND m.agent_id=? AND m.revoked=0 AND m.expires>?""",
+      (self.mandate,self.agent,time.time())).fetchone()
+    return row is not None
+  except (sqlite3.Error,OSError):
+   return False
+
  def once(self):
   runner=JobRunner(self.db)
   try:
@@ -32,9 +47,11 @@ def health_server(daemon,bind="127.0.0.1",port=8080):
   def do_GET(self):
    if self.path not in ("/healthz","/readyz"):
     self.send_error(404);return
-   good=not daemon.stop_event.is_set() and bool(daemon.agent and daemon.mandate)
+   # Liveness never implies task-execution authority or production readiness.
+   ready=daemon.readiness()
+   good=not daemon.stop_event.is_set() if self.path=="/healthz" else ready
    status=200 if good else 503
-   data=json.dumps({"ok":good,"mode":"local-only","stats":daemon.stats}).encode()
+   data=json.dumps({"ok":good,"ready":ready,"mode":"local-only","stats":daemon.stats}).encode()
    self.send_response(status);self.send_header("Content-Type","application/json")
    self.send_header("Content-Length",str(len(data)));self.end_headers();self.wfile.write(data)
   def log_message(self,*args):pass
