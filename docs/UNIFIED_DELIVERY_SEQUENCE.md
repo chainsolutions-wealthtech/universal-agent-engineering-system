@@ -9,10 +9,10 @@
 
 ## Immutable operating rules
 
-- GitHub `main`, PR reviews and required checks are **provider-enforced** boundaries;
+- GitHub `main`, provider-required approvals (if any), and required checks are **provider-enforced** boundaries;
   passing a local `promotion_gate.py` is not equivalent to an enforced ruleset.
-- No merging PR #1 before independently verified main protection, current-head CI,
-  independent approval and the additional promotion prerequisites specified in
+- No merging PR #1 before verified main protection requiring PRs and automated CI,
+  confirmed zero provider-required human approvals, current-head checks and additional prerequisites specified in
   `docs/P0_PROMOTION_BLOCKERS.md` / `scripts/promotion_gate.py`.
 - Every external operation uses an actual scoped permission, current-head readback,
   idempotency key and confirmed receipt; unknown outcomes are reconciled, not replayed.
@@ -26,7 +26,7 @@
   adjacent regressions, current-HEAD CI and durable checkpoint receipts.
 - When a preauthorized operation completes, recompute readiness and proceed to the
   next admissible task; no routine user prompt is required. Stop at real authorization,
-  independent-review, safety or unknown-effect gates, or when no work is admissible.
+  provider-required approval, safety or unknown-effect gates, or when no work is admissible.
 - A ChatGPT chat, a GitHub workflow emitting next actions, a local Docker smoke test,
   and a hosted continuously executing code agent are four distinct things. Only
   separately observed runtime evidence can establish the final one.
@@ -35,7 +35,7 @@
 
 | Step | Owner-approved objective | Reuse and implementation boundary | Acceptance / evidence | Blocking authority |
 |---|---|---|---|---|
-| U00 | **Secure `main` and PR #1** | Issues #2/#3; current-head Checks API, `promotion_gate.py` | Enforced ruleset requires PR, independent approval, correct checks, no bypass/force-push; independent review on exact head | Repository administrator and reviewer |
+| U00 | **Secure `main` and PR #1** | Issues #2/#3; current-head Checks API, `promotion_gate.py` | Enforced ruleset requires PR and green current-head CI/automated-review, zero mandatory human approvals, no bypass/force-push; exact protection readback | Repository administrator (policy setup only) |
 | U01 | **Integrate UAES bootstrap** | PR #1, existing `src/`, tests, `Dockerfile`, `compose.yaml`; do not rewrite history | P0 gates evidenced, green checks and authorized merge SHA re-read on `main` | U00 and remaining promotion gates |
 | U02 | **Bring up isolated durable worker staging** | `src/daemon.py`, `src/job_runner.py`, SQLite, `docs/DEPLOYMENT_RUNBOOK.md` | Independently hosted `/readyz`, persistent volume, service restart, backup/restore, rollback, digest and current SHA evidence | U01, isolated host, authorized secret/config path |
 | U03 | **Verify GitHub App and token broker** | `src/github_app_auth.py`, `docs/GITHUB_APP_CAPABILITY_MATRIX.md`, issue #4 | App/installation identity, scope and exact grants read back; expiring scoped installation tokens, secret-store isolation | U00–U02, approved App installation and broker |
@@ -43,7 +43,7 @@
 | U05 | **Implement mandate, program and task factory** | Extend the existing UAES task DAG only; Project → Mandate/Mission → Program → WorkItem/Wave → TaskBlueprint → Task → UTL | Parent/child traceability, dependency readiness, deduplication, collision tests, no fabricated authorization | U04, authority and state migration checks |
 | U06 | **Admit and recover authorized code agents** | Existing agents/mandates/sessions/claims/leases/fencing, checkpoints and journal | `Je suis agent codeur` triggers identity and effective-rights verification, context reconciliation, checkpoint rebind and admissible claim | U02/U03/U05; no permission derived from chat phrase |
 | U07 | **Connect real sandboxed coding execution** | Extend `src/uaes_worker.py`, `src/job_runner.py`, `src/daemon.py`; no second scheduler | Scoped task/UTL produces isolated code diff, RED/GREEN, adjacent regression tests and branch commit | U06, verified executor identity, sandbox and safety |
-| U08 | **Govern GitHub PR → CI → review → merge → deploy** | Existing GitHub Actions, checks/receipt verifier/effect coordinator; project-specific deploy adapter | Exact SHA, independent review, required checks, allowed merge, release/deployment and runtime readback when applicable | U00/U03/U07, target repo/environment policy |
+| U08 | **Govern GitHub PR → CI → automated checks → merge → deploy** | Existing GitHub Actions, checks/receipt verifier/effect coordinator; project-specific deploy adapter | Exact SHA, automated security/regression review, required checks, allowed merge, release/deployment and runtime readback when applicable | U00/U03/U07, target repo/environment policy |
 | U09 | **Certify AUTO_CONTINUE and restart resilience** | Existing daemon, effect journal, leases/fencing and next-action projection; historical MCP `PROGRAM_AUTO_CONTINUE` only as non-authoritative reference | Two independent eligible tasks advance sequentially without another chat turn; crash/restart/duplicate-event recovery and no bypass | U05–U08 |
 | U10 | **Optional MCP interoperability** | Explicit adapter to an approved MCP governed admission/target mapping; NO second task or runtime authority | Same target task has one owning authority; stand-alone mode works without MCP; integration contract and isolation tests | U09 and separately approved MCP boundary |
 | U11 | **Pilot on Openfunds and another isolated repository** | Install App + per-project configuration, not a cloned UAES engine | Two repositories cartographed, eligible tasks produced/tested, independently governed delivery and continuation evidence | U09, repo-specific permissions; U10 not required |
@@ -77,10 +77,14 @@ Observed 2026-11-06 after the worker-readiness patch:
   not attested; no production deployment, main merge or external repo write.
 
 **NEXT_ACTION**: execute U00 by a truly authorized branch-rule administrator and
-independent reviewer. Meanwhile prepare safe additive work for U02–U05 on separate
+a verified zero-human-approval branch policy and automated CI. Meanwhile prepare safe additive work for U02–U05 on separate
 reviewable changes and re-check each GitHub SHA before writing. Once U00 gates are
 attested, promote U01 and continue through the ordered dependencies. Record exact
-commit/check/approval/merge/deploy/runtime receipts. Never substitute a GitHub
+commit/check/policy/merge/deploy/runtime receipts. Never substitute a GitHub
 checkpoint comment for a verified runtime state.
 
-Related anchors: PR #1; issues #2 (ruleset), #3 (review), #4 (App), #5 (worker).
+Related anchors: PR #1; issues #2 (ruleset), #3 (automated review), #4 (App), #5 (worker).
+
+## Owner policy revision — 2026-11-06
+
+The owner removed UAES's requirement for an independent human PR approval. **Automated Review** now means a real successful GitHub Actions security/regression check (`automated-review`) bound to the exact current PR-head SHA, not an endorsement by a human or a forged approval event. Protected-main must enforce pull requests and the required automated checks with **zero required approving reviews**. Any existing GitHub/organization policy that imposes human approval remains binding until legitimately changed by an authorized administrator; the UAES engine must never bypass it. The U00 gate remains blocked while main is unprotected or review-policy readback is unavailable. The preceding live-evidence baseline is a historical snapshot, not current validation.
