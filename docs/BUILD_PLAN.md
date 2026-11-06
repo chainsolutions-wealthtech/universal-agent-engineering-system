@@ -1,5 +1,8 @@
 # Construction plan — proposed
 
+**Execution order (owner-approved 2026-11-06):** [UNIFIED_DELIVERY_SEQUENCE.md](UNIFIED_DELIVERY_SEQUENCE.md) is the cross-phase dependency and live-evidence guide. The P00–P13 table below is preserved as the original capability plan; neither document is an execution permission or a second task queue.
+
+
 | Phase | Goal |
 |---|---|
 | P00 | Provenance, charter and continuity |
