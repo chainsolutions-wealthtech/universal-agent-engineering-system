@@ -8,6 +8,14 @@
   "branch": "bootstrap/independent-foundation",
   "decisions_ref": "docs/DECISIONS.md",
   "plan_ref": "docs/BUILD_PLAN.md",
-  "next_action": "INDEPENDENT_REVIEW_OF_BOOTSTRAP_PR_BEFORE_MERGE",
-  "safety": "no_external_mutations_or_inherited_authority"
+  "next_action": "ENFORCE_MAIN_RULESET_THEN_OBTAIN_INDEPENDENT_REVIEW_PR1",
+  "safety": "no_external_mutations_or_inherited_authority",
+  "execution_sequence_ref": "docs/UNIFIED_DELIVERY_SEQUENCE.md",
+  "active_gate": "U00",
+  "blocked_gates": [
+    "MAIN_RULESET_UNENFORCED",
+    "INDEPENDENT_REVIEW_MISSING",
+    "UAES_RUNTIME_UNATTESTED",
+    "UAES_APP_PERMISSIONS_UNATTESTED"
+  ]
 }
