@@ -31,6 +31,8 @@
   and a hosted continuously executing code agent are four distinct things. Only
   separately observed runtime evidence can establish the final one.
 
+For the U00 GitHub administration route and exact ruleset readback, see [U00_MAIN_RULESET_RUNBOOK.md](U00_MAIN_RULESET_RUNBOOK.md). The authorized admin installer is `scripts/configure_main_ruleset.py`; a dry-run or local passing test is never branch protection evidence.
+
 ## Ordered dependency chain
 
 | Step | Owner-approved objective | Reuse and implementation boundary | Acceptance / evidence | Blocking authority |
