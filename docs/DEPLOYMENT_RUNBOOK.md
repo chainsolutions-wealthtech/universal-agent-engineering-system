@@ -4,7 +4,7 @@ This repository supplies a Docker image and Compose service capable of polling *
 
 ## Preconditions
 - Independent authorized host and container runtime; no MCP/GRT/UAP V5 infrastructure use by default.
-- Verified PR, main ruleset, independent review and pinned deployment revision.
+- Verified PR, enforced main ruleset, successful automated security/regression checks bound to the exact SHA and pinned deployment revision.
 - Persistent backed-up volume with authorized existing agent/mandate and appropriate filesystem ownership.
 - Scoped secret vault and token broker required before adding any GitHub API worker.
 - Restore/rollback plan and health/observability checks.
