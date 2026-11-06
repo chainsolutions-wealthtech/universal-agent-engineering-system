@@ -10,7 +10,7 @@ Run the complete software lifecycle without repeated human operation: intake, di
 - No secret in git, logs, prompts, issues or public documentation. Private transcripts remain in a protected evidence store.
 - Persist verified source, intent, approval, plan revision, action request, result and receipt for each transition.
 - No claim of completed work unless the target system has been re-read and independently checked.
-- No automatic merge of unreviewed high-impact or policy changes; automated independent review may be used only when explicitly accepted by policy and supported by enforced gates.
+- The UAES owner policy requires **automated CI, code-policy and security checks**, not an independent human PR reviewer. High-impact operations remain subject to effective provider/organization rules, scoped mandates, enforced risk checks, and any externally mandatory consent. Automatic merges require exact-head evidence and cannot bypass externally enforced approvals.
 - External repositories have their own authorities; their roles/identities/tasks must not be imported as UAES permissions.
 
 ## End-to-end state flow
