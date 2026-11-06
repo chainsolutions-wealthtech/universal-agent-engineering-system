@@ -2,7 +2,7 @@
   "schema_version": 1,
   "scope": "chainsolutions-wealthtech/universal-agent-engineering-system",
   "required_bypass_mode": "always",
-  "verification": "REQUIRES_EFFECTIVE_GITHUB_READBACK",
+  "verification": "CANDIDATE_REQUIRES_LIVE_GITHUB_APP_AND_INSTALLATION_READBACK",
   "accounts": [
     {
       "account_login": "Wealthtechinnovations",
@@ -25,9 +25,10 @@
       "account_id": 299685687,
       "account_type": "Organization",
       "bypass_actor_type": "Integration",
-      "app_slug": null,
-      "bypass_actor_id": null,
-      "bypass_mode": "always"
+      "app_slug": "chainsolutions-universal-gateway",
+      "bypass_actor_id": 5417646,
+      "bypass_mode": "always",
+      "identity_claim": "OWNER_DECLARED_CANDIDATE_NOT_PROVIDER_ATTESTED"
     }
   ]
 }
