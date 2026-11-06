@@ -1,5 +1,7 @@
 # Worker MVP checkpoint
 
+> **Historical checkpoint.** Reviewer-related requirements in this original snapshot are superseded for UAES by D007 (2026-11-06): automated current-head security/regression checks, **no mandatory human PR approval**, and no bypass of actual external GitHub rules. Historical observations below remain unchanged.
+
 ## Implemented on bootstrap branch
 A bounded, synchronous worker runs allowlisted, deterministic, **local-only** actions (analyze/validate) against SQLite-backed tasks. It requires an agent and scoped mandate, obtains transactional claim fencing, writes completion + audit event, and supports read-only resume after process reopening. CI exercises an interrupted/reopened state and asserts no duplicate completion.
 
