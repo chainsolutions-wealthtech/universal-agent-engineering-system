@@ -15,6 +15,7 @@ REQUIRED_CHECKS = {
     "Documentation validation",
     "UAES Continuity Dispatch",
     "UAES Container Smoke",
+    "UAES Automated Review",
 }
 
 # GitHub Checks API exposes job names, not their parent workflow titles.
@@ -23,6 +24,7 @@ REQUIRED_CHECK_JOBS = {
     "Documentation validation": "documentary-contracts",
     "UAES Continuity Dispatch": "determine-next",
     "UAES Container Smoke": "container-smoke",
+    "UAES Automated Review": "automated-review",
 }
 _SHA = re.compile(r"^[a-fA-F0-9]{40}$")
 
@@ -59,8 +61,13 @@ def assess(snapshot):
     failures = []
     if not snapshot.get("main_protected"):
         failures.append("MAIN_UNPROTECTED")
-    if not snapshot.get("independent_approval"):
-        failures.append("INDEPENDENT_APPROVAL_MISSING")
+    # Owner policy: no mandatory human/independent PR review. The effective
+    # provider-side policy must be observed; never override an existing rule.
+    approvals = snapshot.get("required_approving_reviews")
+    if not isinstance(approvals, int) or isinstance(approvals, bool) or approvals < 0:
+        failures.append("REVIEW_POLICY_UNVERIFIED")
+    elif approvals > 0:
+        failures.append("PROVIDER_REVIEW_REQUIRED")
     if snapshot.get("draft", True):
         failures.append("PR_STILL_DRAFT")
     if not snapshot.get("permissions_attested"):
