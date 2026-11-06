@@ -2,10 +2,15 @@
 import unittest
 from scripts.configure_main_ruleset import (
     GITHUB_ACTIONS_APP_ID, REQUIRED_JOBS, RulesetGateError,
-    proposed_ruleset, validate_current_head_checks, verify_effective_rules,
+    proposed_ruleset, validate_current_head_checks, verify_effective_rules, verify_effective_bypass,
 )
 
 SHA = "a" * 40
+ACTORS = [
+    {"actor_type": "User", "actor_id": 94637590, "bypass_mode": "always"},
+    {"actor_type": "User", "actor_id": 270385782, "bypass_mode": "always"},
+    {"actor_type": "Integration", "actor_id": 1234567, "bypass_mode": "always"},
+]
 
 
 def valid_pull():
@@ -21,21 +26,32 @@ def valid_checks():
 
 
 def applied_rules():
-    return [{"ruleset_id": 9, **item} for item in proposed_ruleset()["rules"]]
+    return [{"ruleset_id": 9, **item} for item in proposed_ruleset(ACTORS)["rules"]]
 
 
 class RulesetTests(unittest.TestCase):
-    def test_main_ruleset_enforces_pr_zero_review_all_checks_no_bypass(self):
+    def test_main_ruleset_preserves_three_bypass_actors_and_automated_checks(self):
         config = proposed_ruleset()
         self.assertEqual(config["enforcement"], "active")
         self.assertEqual(config["conditions"]["ref_name"]["include"], ["refs/heads/main"])
-        self.assertEqual(config["bypass_actors"], [])
+        self.assertEqual(config["bypass_actors"], ACTORS)
         checks = next(r for r in config["rules"] if r["type"] == "required_status_checks")
         self.assertEqual([x["context"] for x in checks["parameters"]["required_status_checks"]], list(REQUIRED_JOBS))
         self.assertTrue(checks["parameters"]["strict_required_status_checks_policy"])
         reviews = next(r for r in config["rules"] if r["type"] == "pull_request")
         self.assertEqual(reviews["parameters"]["required_approving_review_count"], 0)
         self.assertFalse(reviews["parameters"]["require_code_owner_review"])
+
+    def test_provider_must_attest_exact_bypass_actor_count_and_identity(self):
+        details = {"enforcement": "active", "bypass_actors": [dict(x) for x in ACTORS]}
+        self.assertTrue(verify_effective_bypass(details, ACTORS))
+        details["bypass_actors"].pop()
+        with self.assertRaisesRegex(RulesetGateError, "EXACT_THREE_ACCOUNT_BYPASS"):
+            verify_effective_bypass(details, ACTORS)
+        details = {"enforcement": "active", "bypass_actors": [dict(x) for x in ACTORS]}
+        details["bypass_actors"][0]["bypass_mode"] = "pull_request"
+        with self.assertRaisesRegex(RulesetGateError, "EXACT_THREE_ACCOUNT_BYPASS"):
+            verify_effective_bypass(details, ACTORS)
 
     def test_current_exact_pr_head_is_required(self):
         self.assertEqual(validate_current_head_checks(valid_pull(), valid_checks()), SHA)
