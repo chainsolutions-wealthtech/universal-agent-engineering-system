@@ -70,10 +70,17 @@ def assess(snapshot):
         failures.append("PROVIDER_REVIEW_REQUIRED")
     if snapshot.get("draft", True):
         failures.append("PR_STILL_DRAFT")
-    if not snapshot.get("permissions_attested"):
-        failures.append("INSTALLATION_PERMISSIONS_UNATTESTED")
-    if not snapshot.get("isolated_deployment_ready"):
-        failures.append("ISOLATED_RUNTIME_UNVERIFIED")
+    # The bootstrap PR introduces only inert, local-only prototypes. It
+    # must be integrated before an isolated hosted runtime can be deployed.
+    # Never apply this exemption to external GitHub writes or deployment.
+    stage = snapshot.get("promotion_stage", "production")
+    if stage not in ("bootstrap", "production"):
+        failures.append("PROMOTION_STAGE_UNVERIFIED")
+    if stage != "bootstrap":
+        if not snapshot.get("permissions_attested"):
+            failures.append("INSTALLATION_PERMISSIONS_UNATTESTED")
+        if not snapshot.get("isolated_deployment_ready"):
+            failures.append("ISOLATED_RUNTIME_UNVERIFIED")
 
     # Prefer immutable-SHA-bound live checks when supplied. Legacy snapshots
     # are retained for existing callers and synthetic tests only.
