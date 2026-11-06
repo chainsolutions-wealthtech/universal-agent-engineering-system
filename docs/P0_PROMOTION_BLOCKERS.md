@@ -5,6 +5,10 @@ UAES no longer requires an independent *human* PR reviewer. Configure an effecti
 
 Until main protection, exact check names, effective review-count policy, app permissions, and isolated runtime prerequisites are observed, promotion remains blocked. If an existing organization/provider policy requires approval, do not bypass it: obtain a legitimate policy change from the authorized GitHub administrator or stop that merge. The below 2026-10-22 assessment remains historical evidence, **not current instructions**.
 
+### Rights-preservation amendment (2026-11-06, D008)
+
+The owner has now explicitly required that the three authorized installation accounts retain maximal capabilities. **Do not execute the older empty-bypass configuration.** The updated installer `scripts/configure_main_ruleset.py` requires exactly three scoped, auditable `always` bypass actors and provider-side identity/installation verification: Wealthtechinnovations and Patricked-code as Users, plus an actual GitHub App Integration installed on UAES for chainsolutions-wealthtech. The third App principal is not yet attested, and the connected GitHub tool still cannot create rulesets. No ruleset has been applied. See `state/AUTHORIZED_BYPASS_ACCOUNTS.json` and `docs/U00_MAIN_RULESET_RUNBOOK.md`.
+
 ---
 
 # P0 promotion blockers — checked 2026-10-22
