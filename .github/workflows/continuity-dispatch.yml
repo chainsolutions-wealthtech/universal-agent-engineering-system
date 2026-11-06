@@ -41,12 +41,30 @@ jobs:
             try:return json.loads(p.stdout)
             except json.JSONDecodeError:return None
           pr=gh(f"repos/{repo}/pulls/1") or {}
+          head=pr.get("head",{}).get("sha","")
+          branch=gh(f"repos/{repo}/branches/main") or {}
           protection=gh(f"repos/{repo}/branches/main/protection")
-          checks=gh(f"repos/{repo}/commits/{pr.get('head',{}).get('sha','missing')}/check-runs") or {}
-          passed=any(x.get("conclusion")=="success" and x.get("name") in ("documentary-contracts","Documentation validation / documentary-contracts") for x in checks.get("check_runs",[]))
-          reviews=gh(f"repos/{repo}/pulls/1/reviews") or []
-          approved=any(r.get("state")=="APPROVED" and r.get("user",{}).get("login")!=pr.get("user",{}).get("login") for r in reviews)
-          ev={"main_protected":protection is not None,"independent_review_approved":approved,"ci_success_current_head":passed,"permissions_attested":False,"runtime_verified":False}
+          rulesets=gh(f"repos/{repo}/rulesets")
+          checks=gh(f"repos/{repo}/commits/{head}/check-runs") if head else None
+          runs=(checks or {}).get("check_runs",[])
+          def check_green(job_name):
+            items=[x for x in runs if x.get("name")==job_name
+              and x.get("head_sha")==head and x.get("app",{}).get("slug")=="github-actions"
+              and isinstance(x.get("id"),int)]
+            if not items:return False
+            latest=max(items,key=lambda x:x["id"])
+            return latest.get("status")=="completed" and latest.get("conclusion")=="success"
+          required=("core-tests","documentary-contracts","container-smoke","automated-review")
+          # Fail closed on unknown rulesets or branch protection; a GitHub-enforced
+          # approval requirement is never ignored to satisfy owner automation policy.
+          review_policy_verified=(isinstance(protection,dict)
+            and protection.get("required_pull_request_reviews") is None
+            and isinstance(rulesets,list) and not rulesets)
+          ev={"main_protected":branch.get("protected") is True,
+              "review_policy_automated":review_policy_verified,
+              "automated_review_passed":check_green("automated-review"),
+              "ci_success_current_head":all(check_green(name) for name in required),
+              "permissions_attested":False,"runtime_verified":False}
           Path("evidence.json").write_text(json.dumps(ev))
           PY
       - name: Select next action (read-only)
