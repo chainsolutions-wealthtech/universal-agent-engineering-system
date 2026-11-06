@@ -32,6 +32,8 @@ class UnifiedDeliverySequenceTests(unittest.TestCase):
         self.assertNotIn("INDEPENDENT_REVIEW_MISSING", state["blocked_gates"])
         self.assertEqual(state["owner_pr_review_policy"], "NO_MANDATORY_HUMAN_REVIEW")
         self.assertIn("PROVIDER_REVIEW_POLICY_UNVERIFIED", state["blocked_gates"])
+        self.assertEqual(state["authorized_account_mapping_ref"], "state/AUTHORIZED_BYPASS_ACCOUNTS.json")
+        self.assertIn("THIRD_ACCOUNT_APP_ACTOR_UNVERIFIED", state["blocked_gates"])
 
 
 if __name__ == "__main__":
