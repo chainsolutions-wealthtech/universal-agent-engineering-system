@@ -11,6 +11,9 @@ import os
 import sys
 import urllib.error
 import urllib.request
+from scripts.authorized_bypass_policy import (
+    BypassPolicyError, load_bypass_configuration, verify_bypass_principals,
+)
 
 REPOSITORY = "chainsolutions-wealthtech/universal-agent-engineering-system"
 RULESET_NAME = "UAES main governed automation D007"
@@ -30,13 +33,13 @@ class RulesetGateError(RuntimeError):
     """A provider-authenticated prerequisite is missing or ambiguous."""
 
 
-def proposed_ruleset():
+def proposed_ruleset(actors):
     """Declarative provider-enforced policy, not a local substitute for GitHub."""
     return {
         "name": RULESET_NAME,
         "target": "branch",
         "enforcement": "active",
-        "bypass_actors": [],
+        "bypass_actors": actors,
         "conditions": {"ref_name": {"include": ["refs/heads/main"], "exclude": []}},
         "rules": [
             {"type": "deletion"},
@@ -120,6 +123,24 @@ def verify_effective_rules(branch, effective, ruleset_id):
     return True
 
 
+def verify_effective_bypass(ruleset, expected_actors):
+    """Ensure GitHub actually recorded the exact three unrestricted actors."""
+    if not isinstance(ruleset, dict) or ruleset.get("enforcement") != "active":
+        raise RulesetGateError("GITHUB_RULESET_ENFORCEMENT_UNVERIFIED")
+    effective = ruleset.get("bypass_actors")
+    if not isinstance(effective, list):
+        raise RulesetGateError("GITHUB_BYPASS_ACTORS_NOT_RETURNED")
+    def normalized(rows):
+        return sorted(
+            (str(r.get("actor_type")), str(r.get("actor_id")),
+             str(r.get("bypass_mode")))
+            for r in rows if isinstance(r, dict)
+        )
+    if len(effective) != 3 or normalized(effective) != normalized(expected_actors):
+        raise RulesetGateError("EXACT_THREE_ACCOUNT_BYPASS_NOT_ENFORCED")
+    return True
+
+
 class GitHubAdminClient:
     def __init__(self, token, http_open=None):
         if not token:
@@ -148,7 +169,10 @@ class GitHubAdminClient:
             raise RulesetGateError("GITHUB_PROVIDER_UNVERIFIED_%s" % type(exc).__name__) from None
 
 
-def ensure_ruleset(client):
+def ensure_ruleset(client, configuration, actors):
+    # Never create a restrictive rule without effective verification of all
+    # three requested account principals and their UAES repository access.
+    verify_bypass_principals(client, configuration)
     base = "/repos/" + REPOSITORY
     branch = client.request("GET", base + "/branches/main")
     if not isinstance(branch, dict) or not branch.get("commit", {}).get("sha"):
@@ -180,13 +204,14 @@ def ensure_ruleset(client):
             raise RulesetGateError("UNMANAGED_INHERITED_RULESET_CONFLICT")
         ruleset_id = item["id"]
         current = client.request("GET", base + "/rulesets/" + str(ruleset_id))
-        desired = proposed_ruleset()
-        for field in ("name", "target", "enforcement", "conditions", "bypass_actors", "rules"):
+        desired = proposed_ruleset(actors)
+        for field in ("name", "target", "enforcement", "conditions", "rules"):
             if current.get(field) != desired[field]:
                 raise RulesetGateError("NAMED_RULESET_DIFFERS_MANUAL_RECONCILIATION_REQUIRED:" + field)
+        verify_effective_bypass(current, actors)
         operation = "ALREADY_PRESENT"
     else:
-        created = client.request("POST", base + "/rulesets", proposed_ruleset())
+        created = client.request("POST", base + "/rulesets", proposed_ruleset(actors))
         ruleset_id = created.get("id") if isinstance(created, dict) else None
         if not isinstance(ruleset_id, int):
             raise RulesetGateError("RULESET_CREATE_UNVERIFIED")
@@ -196,24 +221,42 @@ def ensure_ruleset(client):
     verified_branch = client.request("GET", base + "/branches/main")
     effective = client.request("GET", base + "/rules/branches/main?per_page=100")
     verify_effective_rules(verified_branch, effective, ruleset_id)
+    verified_detail = client.request("GET", base + "/rulesets/" + str(ruleset_id))
+    verify_effective_bypass(verified_detail, actors)
     return {"status": "VERIFIED_ENFORCED", "operation": operation,
             "repository": REPOSITORY, "ruleset_id": ruleset_id,
             "pr_head_sha_at_preflight": sha, "required_checks": list(REQUIRED_JOBS),
-            "required_human_approvals": 0, "branch": "main"}
+            "required_human_approvals": 0, "branch": "main",
+            "verified_bypass_actor_count": len(actors), "bypass_mode": "always"}
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--apply", action="store_true", help="Admin-only: create and verify active ruleset")
+    parser.add_argument("--apply", action="store_true",
+                        help="Admin-only: configure and attest exactly three account bypass actors")
+    parser.add_argument("--actors-json", default="state/AUTHORIZED_BYPASS_ACCOUNTS.json",
+                        help="JSON with the three verified user/organization App actor mappings")
     args = parser.parse_args(argv)
+    try:
+        configuration, actors = load_bypass_configuration(args.actors_json)
+    except BypassPolicyError as exc:
+        print(json.dumps({
+            "status": "BLOCKED_NO_RIGHTS_CHANGE",
+            "reason": str(exc),
+            "config": args.actors_json,
+            "note": "No empty bypass list will be applied; third account App mapping must be attested.",
+        }, sort_keys=True))
+        return 1 if args.apply else 0
     if not args.apply:
-        print(json.dumps({"status": "DRY_RUN_ONLY", "ruleset": proposed_ruleset()}, indent=2, sort_keys=True))
+        print(json.dumps({"status": "DRY_RUN_ONLY",
+                          "ruleset": proposed_ruleset(actors)}, indent=2, sort_keys=True))
         return 0
     try:
         token = os.getenv("UAES_ADMIN_GITHUB_TOKEN", "")
-        result = ensure_ruleset(GitHubAdminClient(token))
-    except RulesetGateError as exc:
-        print(json.dumps({"status": "BLOCKED", "reason": str(exc)}, sort_keys=True))
+        result = ensure_ruleset(GitHubAdminClient(token), configuration, actors)
+    except (RulesetGateError, BypassPolicyError) as exc:
+        print(json.dumps({"status": "BLOCKED_NO_RIGHTS_CHANGE",
+                          "reason": str(exc)}, sort_keys=True))
         return 1
     print(json.dumps(result, sort_keys=True))
     return 0
