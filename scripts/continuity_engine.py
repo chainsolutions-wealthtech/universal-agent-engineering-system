@@ -13,7 +13,8 @@ def main():
     evidence=json.loads(Path(evidence_file).read_text()) if evidence_file else {}
     gates=[
         ("P0_MAIN_PROTECTION",bool(evidence.get("main_protected",False)),"Observe GitHub ruleset/branch protection on main; administrative action requires separately verified rights."),
-        ("P0_INDEPENDENT_REVIEW",bool(evidence.get("independent_review_approved",False)),"Request independent review of PR #1; never self-approve."),
+        ("P0_NO_HUMAN_REVIEW_POLICY",bool(evidence.get("review_policy_automated",False)),"Verify GitHub protection and the effective required-approvals count is zero; never bypass externally enforced approval requirements."),
+        ("P0_AUTOMATED_REVIEW",bool(evidence.get("automated_review_passed",False)),"Verify automated-review GitHub Actions check succeeded at current PR HEAD."),
         ("P0_CI",bool(evidence.get("ci_success_current_head",False)),"Verify required CI on current PR head SHA."),
         ("P1_PERMISSION_AUDIT",bool(evidence.get("permissions_attested",False)),"Inventory effective GitHub App permissions and installation."),
         ("P1_RUNTIME",bool(evidence.get("runtime_verified",False)),"Build and validate persistent authorized workers and audit storage.")
