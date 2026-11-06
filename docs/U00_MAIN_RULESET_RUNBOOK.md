@@ -10,7 +10,9 @@ branch protections, organizational rules or applicable terms.
 - Protected ref: `refs/heads/main`; ruleset name: `UAES main governed automation D007`.
 - Merge path: pull requests only. **Zero required human approvals** under UAES policy D007. No required code-owner review or last-push reviewer.
 - Required checks on the current PR HEAD from the **GitHub Actions application ID 15368** (observed on 2026-11-06): `core-tests`, `documentary-contracts`, `container-smoke`, `automated-review`, `determine-next`.
-- Required checks use strict up-to-date base policy; no delete, no force push, and no configured bypass actor.
+- Required checks use strict up-to-date base policy. For ordinary actors: no deletion or force-push. The three explicitly authorized identities retain an auditable `always` bypass on **this** ruleset; no blanket RepositoryRole or OrganizationAdmin bypass is granted.
+- GitHub identities verified from current API access: `Wealthtechinnovations` (User ID 94637590), `Patricked-code` (User ID 270385782), and `chainsolutions-wealthtech` (Organization ID 299685687). This is three **installation accounts**, not three user logins. The organization's authorized executing principal must be mapped to the exact GitHub App `Integration` installed on UAES; an organization cannot be used as a `User` bypass actor.
+- The discoverable mapping is `state/AUTHORIZED_BYPASS_ACCOUNTS.json`. Its organization GitHub App mapping is intentionally `null` until the App slug/ID and target repository installation are attested. This prevents accidentally restricting any approved actor.
 - Organization-level rules cannot be overridden; if there is a real external approval requirement, stop and report that requirement.
 
 ## Safe preparatory execution
@@ -22,13 +24,15 @@ python -m unittest discover -s tests -v
 python scripts/configure_main_ruleset.py
 ```
 
-The second command is a **network-free dry-run**, showing the intended JSON policy.
+The second command is a **network-free dry-run**. While the organization's App actor is unresolved, it emits `BLOCKED_NO_RIGHTS_CHANGE` rather than showing or applying an incomplete policy. This is deliberate and does not require routine owner approval.
 
 ## Authorized administration and readback
 
 GitHub's `POST /repos/{owner}/{repo}/rulesets` requires an authenticated
 credential with **Repository Administration: write**. A GitHub profile reporting
 `admin=true` does not itself provide that credential to a particular tool.
+
+Once the exact organization App integration is verified, populate the third account's `app_slug` and `bypass_actor_id` in the mapping file on the reviewed branch, then rerun tests. The installer additionally validates all three identities and the App's organization installation/repository access through the provider API, failing closed if evidence is inaccessible.
 
 Once an authorized GitHub administration executor exists, supply its **short-lived**
 token from a protected secret broker as the runtime-only
@@ -42,15 +46,15 @@ Never place the token in the Git repository, CI logs, issues, prompts, command
 arguments, or public documentation. Do not run the privileged installer from
 `pull_request` workflows or untrusted branch code.
 
-The installer reads PR #1, exact current-HEAD GitHub Actions results, current
+The installer reads the three-actor mapping, verifies the two users and the organization's App installation, PR #1, exact current-HEAD GitHub Actions results, current
 branch and effective rules, checks for an existing named ruleset, refuses
 conflicting external review requirements, applies **one** named ruleset if
 absent, and re-reads the effective GitHub policy. It must emit
 `VERIFIED_ENFORCED` with a provider-native ruleset ID before the gate is
 considered completed. A GitHub API failure or ambiguous state is a blocker.
 
-If the ruleset exists but differs, the installer refuses to overwrite it and
-requires deliberate reconciliation. The installer **never merges PR #1**.
+If the ruleset exists but differs, including any of the three bypass identities or bypass modes, the installer refuses to overwrite it and
+requires deliberate reconciliation. The installer **never merges PR #1**. Do not apply the historical `bypass_actors: []` variant: it would conflict with the current owner-approved rights-preservation policy.
 
 ## Post-U00 continuation
 
