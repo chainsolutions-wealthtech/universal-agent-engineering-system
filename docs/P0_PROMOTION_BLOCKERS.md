@@ -1,7 +1,7 @@
 # P0 promotion policy revision — 2026-11-06
 
 **Current owner-approved policy supersedes the historical reviewer requirement below.**
-UAES no longer requires an independent *human* PR reviewer. Configure an effective protected-main ruleset requiring PRs and current-head CI checks (`core-tests`, `documentary-contracts`, `container-smoke`, `determine-next`, `automated-review`), with **zero required approving reviews**, no force-push or unsafe bypass, and verify these settings from GitHub. The automated-review job performs deterministic security checks and full regressions; it is not an independent human approval.
+UAES no longer requires an independent *human* PR reviewer. Configure an effective protected-main ruleset requiring PRs and current-head CI checks (`core-tests`, `documentary-contracts`, `container-smoke`, `determine-next`, `automated-review`), with **zero required approving reviews** and, under owner decision D008, exactly three audited, identity-scoped `always` bypass actors for the authorized accounts. For all other actors, force-push and deletion remain prohibited; verify the effective rules with GitHub. The automated-review job performs deterministic security checks and full regressions; it is not an independent human approval.
 
 Until main protection, exact check names, effective review-count policy, app permissions, and isolated runtime prerequisites are observed, promotion remains blocked. If an existing organization/provider policy requires approval, do not bypass it: obtain a legitimate policy change from the authorized GitHub administrator or stop that merge. The below 2026-10-22 assessment remains historical evidence, **not current instructions**.
 
