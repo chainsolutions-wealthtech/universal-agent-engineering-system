@@ -9,7 +9,7 @@ GitHub issues, pull requests and CI completions trigger reconciliation; an hourl
 ## Gate semantics
 1. Observe current HEAD and effective ruleset/branch protection; absence or inaccessible evidence is **unverified**, never PASS.
 2. Required current-head CI must pass.
-3. Independent review is not the same as CI and cannot be self-certified.
+3. Human PR approval is not a UAES-required gate. An independent human approval cannot be manufactured; instead require a separately executed `automated-review` security/regression GitHub check and verified effective branch policy with zero required approvals. A provider-required human approval, if any, remains binding.
 4. GitHub App permissions and scopes must be attested separately from identity and mandate.
 5. No automatic write or merge may bypass GitHub protections or organizational policies.
 6. On permission, authorization, security or ambiguous effect: STOP and emit a durable blocked receipt.
