@@ -28,9 +28,19 @@ class BypassActorPolicyTests(unittest.TestCase):
         app["app_slug"] = "uaes-test-app"
         app["bypass_actor_id"] = 123456
 
-    def test_discovered_three_accounts_not_yet_equivalent_to_three_bypass_actors(self):
+    def test_missing_app_identity_still_blocks_ruleset(self):
+        self.data["accounts"][2]["app_slug"] = None
+        self.data["accounts"][2]["bypass_actor_id"] = None
         with self.assertRaisesRegex(BypassPolicyError, "TARGET_ORGANIZATION_APP_ID_NOT_ATTESTED"):
             load_bypass_configuration(self.save())
+
+    def test_owner_declared_candidate_is_not_live_attestation(self):
+        self.assertEqual(self.data["accounts"][2]["bypass_actor_id"], 5417646)
+        self.assertEqual(self.data["accounts"][2]["app_slug"], "chainsolutions-universal-gateway")
+        self.assertIn("CANDIDATE", self.data["verification"])
+        _, actors = load_bypass_configuration(self.save())
+        self.assertEqual(actors[2]["actor_id"], 5417646)
+        # Only verify_bypass_principals() performs actual GitHub readback before any write.
 
     def test_three_exact_actors_can_be_constructed_when_app_mapped(self):
         self.complete_app()
