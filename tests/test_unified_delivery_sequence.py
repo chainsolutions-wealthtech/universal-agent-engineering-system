@@ -28,7 +28,9 @@ class UnifiedDeliverySequenceTests(unittest.TestCase):
         self.assertFalse(state["runtime_operational"])
         self.assertEqual(state["active_gate"], "U00")
         self.assertIn("MAIN_RULESET_UNENFORCED", state["blocked_gates"])
-        self.assertIn("INDEPENDENT_REVIEW_MISSING", state["blocked_gates"])
+        self.assertNotIn("INDEPENDENT_REVIEW_MISSING", state["blocked_gates"])
+        self.assertEqual(state["owner_pr_review_policy"], "NO_MANDATORY_HUMAN_REVIEW")
+        self.assertIn("PROVIDER_REVIEW_POLICY_UNVERIFIED", state["blocked_gates"])
 
 
 if __name__ == "__main__":
