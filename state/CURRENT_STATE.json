@@ -8,14 +8,17 @@
   "branch": "bootstrap/independent-foundation",
   "decisions_ref": "docs/DECISIONS.md",
   "plan_ref": "docs/BUILD_PLAN.md",
-  "next_action": "ENFORCE_MAIN_RULESET_THEN_OBTAIN_INDEPENDENT_REVIEW_PR1",
+  "next_action": "U00_ENFORCE_PROTECTED_MAIN_PR_AND_AUTOMATED_CHECKS_ZERO_REQUIRED_APPROVALS",
   "safety": "no_external_mutations_or_inherited_authority",
   "execution_sequence_ref": "docs/UNIFIED_DELIVERY_SEQUENCE.md",
   "active_gate": "U00",
   "blocked_gates": [
     "MAIN_RULESET_UNENFORCED",
-    "INDEPENDENT_REVIEW_MISSING",
+    "PROVIDER_REVIEW_POLICY_UNVERIFIED",
+    "AUTOMATED_REVIEW_NOT_YET_PROMOTED_ON_MAIN",
     "UAES_RUNTIME_UNATTESTED",
     "UAES_APP_PERMISSIONS_UNATTESTED"
-  ]
+  ],
+  "owner_pr_review_policy": "NO_MANDATORY_HUMAN_REVIEW",
+  "required_automated_review_job": "automated-review"
 }
