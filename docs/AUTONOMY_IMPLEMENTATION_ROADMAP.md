@@ -1,6 +1,6 @@
 # Program for end-to-end autonomous delivery
 
-**Unified delivery and real gates:** [UNIFIED_DELIVERY_SEQUENCE.md](UNIFIED_DELIVERY_SEQUENCE.md) sequences P0 repository protection and independent PR #1 review, bootstrap promotion, isolated durable worker, verified GitHub App, cartography, program/task/UTL factory, agent admission, continuous code delivery and optional MCP interoperability. The A00–A12 milestone IDs below are retained; no green CI or planning document constitutes hosted-runtime evidence.
+**Unified delivery and real gates:** [UNIFIED_DELIVERY_SEQUENCE.md](UNIFIED_DELIVERY_SEQUENCE.md) sequences P0 repository protection and automated security and current-head PR #1 checks, bootstrap promotion, isolated durable worker, verified GitHub App, cartography, program/task/UTL factory, agent admission, continuous code delivery and optional MCP interoperability. The A00–A12 milestone IDs below are retained; no green CI or planning document constitutes hosted-runtime evidence.
 
 
 All milestones are **PLANNED** unless separately verified by runtime receipts.
@@ -16,7 +16,7 @@ All milestones are **PLANNED** unless separately verified by runtime receipts.
 | A06 | Agent registration, mandates, task DAG, claims | Concurrency and revoke tests |
 | A07 | Bus, retries, dead letters, resume | Crash/unknown outcome tests |
 | A08 | Provider and skill adapters | Provider switch continuity test |
-| A09 | Autonomous code-to-PR loop | Sandbox, CI, independent review |
+| A09 | Autonomous code-to-PR loop | Sandbox, CI and automated security/regression review |
 | A10 | Controlled merge, release, deploy and rollback | Enforced branch/environment gates |
 | A11 | Monitoring, recovery and operator cockpit | Incident and disaster drills |
 | A12 | Security review and full autonomous pilot | External sign-off where mandatory |
