@@ -31,7 +31,7 @@ def applied_rules():
 
 class RulesetTests(unittest.TestCase):
     def test_main_ruleset_preserves_three_bypass_actors_and_automated_checks(self):
-        config = proposed_ruleset()
+        config = proposed_ruleset(ACTORS)
         self.assertEqual(config["enforcement"], "active")
         self.assertEqual(config["conditions"]["ref_name"]["include"], ["refs/heads/main"])
         self.assertEqual(config["bypass_actors"], ACTORS)
