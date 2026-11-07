@@ -55,4 +55,20 @@ class RunnerTests(unittest.TestCase):
    self.assertEqual(runner.engine.db.execute(
        "SELECT COUNT(*) FROM tasks WHERE state='READY'").fetchone()[0],50)
    runner.close()
+ def test_continuity_mandate_filter_precedes_candidate_limit(self):
+  """Fifty bound tasks with the wrong project must not starve an authorized task."""
+  from src.continuity_link import ROOT_ID
+  with tempfile.TemporaryDirectory() as folder:
+   runner=JobRunner(Path(folder)/"db.sqlite",continuity_id=ROOT_ID)
+   agent=runner.engine.agent("scoped-agent")
+   mandate=runner.engine.mandate(agent,"authorized-project","analyze")
+   for index in range(50):
+    runner.engine.submit(f"wrong-project-{index}","analyze",{"index":index})
+   eligible=runner.engine.submit("authorized-project","analyze",{"expected":"authorized"})
+   result=runner.run_once(agent,mandate)
+   self.assertIsNotNone(result)
+   self.assertEqual(result["task_id"],eligible)
+   self.assertEqual(runner.engine.db.execute(
+       "SELECT COUNT(*) FROM tasks WHERE state='READY'").fetchone()[0],50)
+   runner.close()
 if __name__=="__main__":unittest.main()
