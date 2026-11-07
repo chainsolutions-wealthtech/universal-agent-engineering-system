@@ -62,6 +62,29 @@ class ContinuityTests(unittest.TestCase):
         self.engine = ContinuityEngine(self.path)
         self.assertIsNotNone(self.engine.resume()["checkpoint"])
 
+    def test_daemon_restart_preserves_continuity_and_no_replay(self):
+        from src.daemon import Daemon
+        e=self.engine
+        agent=e.agent("daemon-agent")
+        mandate=e.mandate(agent,"daemon-project","validate")
+        task=e.submit("daemon-project","validate",{"value":1})
+        e.db.close()
+        first=Daemon(self.path,agent,mandate,interval=0,continuity_id=ROOT_ID,
+                     continuity_source=ROOT_SOURCE)
+        self.assertIsNotNone(first.once())
+        first_checkpoint=first.stats["checkpoint_id"]
+        self.assertTrue(first.stats["continuity_recovered"])
+        self.assertIsNotNone(first_checkpoint)
+        restarted=Daemon(self.path,agent,mandate,interval=0,continuity_id=ROOT_ID,
+                         continuity_source=ROOT_SOURCE)
+        self.assertIsNone(restarted.once())
+        self.assertTrue(restarted.stats["continuity_recovered"])
+        self.assertGreater(restarted.stats["checkpoint_id"],first_checkpoint)
+        self.engine=ContinuityEngine(self.path)
+        self.assertEqual(self.engine.resume()["tasks"][0]["state"],"DONE")
+        self.assertEqual(self.engine.db.execute(
+            "SELECT COUNT(*) FROM tasks WHERE id=?",(task,)).fetchone()[0],1)
+
     def test_link_failure_rolls_back_task_and_event(self):
         e=self.engine
         before=e.db.execute("SELECT COUNT(*) FROM events").fetchone()[0]
