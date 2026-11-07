@@ -81,6 +81,21 @@ class RepositorySnapshotTests(unittest.TestCase):
         branch["protected"] = None
         self.assertEqual(classify_repository_snapshot(repo, branch, pull, checks, rules)["reason"], "BRANCH_PROTECTION_UNVERIFIED")
 
+    def test_malformed_provider_check_sha_is_ignored_not_crashed(self):
+        repo, branch, pull, checks, rules = self.fixture()
+        checks.extend([
+            {"id": 6, "name": "core-tests", "head_sha": None,
+             "status": "completed", "conclusion": "success"},
+            {"id": 7, "name": "core-tests", "head_sha": 123,
+             "status": "completed", "conclusion": "success"},
+            {"id": 8, "name": "core-tests",
+             "status": "completed", "conclusion": "success"},
+        ])
+        result = classify_repository_snapshot(repo, branch, pull, checks, rules)
+        self.assertEqual(result["status"], "OBSERVED")
+        self.assertEqual(result["check_runs_latest"]["core-tests"]["id"], 4)
+        self.assertEqual(result["check_runs_latest"]["core-tests"]["conclusion"], "failure")
+
     def test_unrequested_pull_does_not_fabricate_checks(self):
         repo, branch, pull, checks, rules = self.fixture()
         result = classify_repository_snapshot(repo, branch, None, None, rules)
