@@ -103,4 +103,24 @@ class RunnerTests(unittest.TestCase):
    self.assertEqual(runner.engine.db.execute("SELECT COUNT(*) FROM tasks WHERE state='READY'").fetchone()[0],50)
    runner.close()
 
+ def test_effect_blocked_tasks_do_not_starve_eligible_continuity_task(self):
+  """Fifty linked, mandated effect-bound tasks cannot hide a later safe linked task."""
+  from src.continuity_link import ROOT_ID
+  with tempfile.TemporaryDirectory() as folder:
+   runner=JobRunner(Path(folder)/"db.sqlite",continuity_id=ROOT_ID)
+   agent=runner.engine.agent("continuity-effect-agent")
+   mandate=runner.engine.mandate(agent,"shared-project","analyze")
+   journal=EffectJournal(runner.engine.db)
+   for index in range(50):
+    tid=runner.engine.submit("shared-project","analyze",{"index":index})
+    eid=journal.prepare(tid,"remote","mutation",f"continuity-blocked-{index}")
+    journal.dispatch(eid)
+   eligible=runner.engine.submit("shared-project","analyze",{"safe":True})
+   result=runner.run_once(agent,mandate)
+   self.assertIsNotNone(result)
+   self.assertEqual(result["task_id"],eligible)
+   self.assertEqual(runner.engine.db.execute(
+       "SELECT COUNT(*) FROM tasks WHERE state='READY'").fetchone()[0],50)
+   runner.close()
+
 if __name__=="__main__":unittest.main()
