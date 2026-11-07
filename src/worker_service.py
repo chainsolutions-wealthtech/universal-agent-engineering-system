@@ -3,7 +3,7 @@ import json,signal,time
 from src.job_runner import JobRunner
 
 class WorkerService:
-    def __init__(self,db_path,agent_id,mandate_id,poll_seconds=1,max_iterations=100):
+    def __init__(self,db_path,agent_id,mandate_id,poll_seconds=1,max_iterations=100,continuity_id=None,continuity_source=None):
         if poll_seconds<=0 or max_iterations<1:
             raise ValueError("bounded positive polling required")
         self.db_path=db_path
@@ -12,12 +12,13 @@ class WorkerService:
         self.poll_seconds=poll_seconds
         self.max_iterations=max_iterations
         self.stopping=False
+        self.continuity_id,self.continuity_source=continuity_id,continuity_source
 
     def stop(self,*_): self.stopping=True
 
     def run(self):
         summary={"attempts":0,"completed":[],"status":"STOPPED"}
-        runner=JobRunner(self.db_path)
+        runner=JobRunner(self.db_path,self.continuity_id,self.continuity_source)
         try:
             for _ in range(self.max_iterations):
                 if self.stopping: break
