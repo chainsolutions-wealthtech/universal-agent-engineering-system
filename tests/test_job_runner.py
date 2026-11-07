@@ -71,6 +71,20 @@ class RunnerTests(unittest.TestCase):
    self.assertEqual(runner.engine.db.execute(
        "SELECT COUNT(*) FROM tasks WHERE state='READY'").fetchone()[0],50)
    runner.close()
+ def test_legacy_mandate_filter_precedes_candidate_limit(self):
+  """Fifty unrelated READY tasks cannot hide the first mandated legacy task."""
+  with tempfile.TemporaryDirectory() as folder:
+   runner=JobRunner(Path(folder)/"db.sqlite")
+   agent=runner.engine.agent("legacy-scoped-agent")
+   mandate=runner.engine.mandate(agent,"permitted","analyze")
+   for index in range(50):
+    runner.engine.submit(f"unpermitted-{index}","analyze",{"index":index})
+   eligible=runner.engine.submit("permitted","analyze",{"safe":True})
+   result=runner.run_once(agent,mandate)
+   self.assertIsNotNone(result)
+   self.assertEqual(result["task_id"],eligible)
+   self.assertEqual(runner.engine.db.execute("SELECT COUNT(*) FROM tasks WHERE state='READY'").fetchone()[0],50)
+   runner.close()
  def test_effect_blocked_tasks_do_not_starve_eligible_legacy_task(self):
   """Fifty effect-blocked READY tasks cannot hide a later safe task."""
   with tempfile.TemporaryDirectory() as folder:
