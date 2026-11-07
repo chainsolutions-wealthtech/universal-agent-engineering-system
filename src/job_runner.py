@@ -23,6 +23,12 @@ class JobRunner:
 
     def run_once(self,agent_id,mandate_id):
         now=time.time()
+        # Exclude effect-bound candidates before LIMIT, without requiring a
+        # journal table in legacy databases that have never used effects.
+        has_effect=self.engine.db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='effects'").fetchone()
+        effect_filter=(" AND NOT EXISTS (SELECT 1 FROM effects AS e WHERE e.task_id=t.id)"
+                       if has_effect else "")
         # Recover only local deterministic actions; no unknown external effect replay.
         if self.continuity_id:
             # Apply continuity eligibility before LIMIT; otherwise 50 unrelated
@@ -35,16 +41,15 @@ class JobRunner:
                 WHERE m.id=? AND m.agent_id=? AND m.project_id=t.project_id
                 AND m.scope=t.action AND m.revoked=0 AND m.expires>?)
               AND t.action IN ('analyze','validate')
-              ORDER BY t.rowid LIMIT 50""",
+              """ + effect_filter + """ ORDER BY t.rowid LIMIT 50""",
               (now,self.continuity_id,mandate_id,agent_id,now)).fetchall()
         else:
             # Preserve the original unscoped runner selection semantics.
-            rows=self.engine.db.execute("""SELECT id,action FROM tasks WHERE state='READY'
-              OR (state='CLAIMED' AND claim_expiry<=?) ORDER BY rowid LIMIT 50""",(now,)).fetchall()
+            rows=self.engine.db.execute("""SELECT t.id,t.action FROM tasks AS t WHERE (t.state='READY'
+              OR (t.state='CLAIMED' AND t.claim_expiry<=?))
+              """ + effect_filter + """ ORDER BY t.rowid LIMIT 50""",(now,)).fetchall()
         for tid,action in rows:
             if action not in ("analyze","validate"): continue
-            has_effect=self.engine.db.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name='effects'").fetchone()
             if has_effect and self.engine.db.execute(
                 "SELECT 1 FROM effects WHERE task_id=? LIMIT 1",(tid,)).fetchone():
                 continue  # External/uncertain effects always need independent reconciliation.
