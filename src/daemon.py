@@ -8,7 +8,8 @@ class Daemon:
   self.db,self.agent,self.mandate,self.interval=db,agent,mandate,interval
   self.continuity_id,self.continuity_source=continuity_id,continuity_source
   self.stop_event=threading.Event()
-  self.stats={"ticks":0,"completed":0,"failures":0,"last_error":None}
+  self.stats={"ticks":0,"completed":0,"failures":0,"last_error":None,
+              "continuity_recovered":False,"checkpoint_id":None}
 
  def readiness(self):
   """Readiness is based on current local authority, not merely configured IDs."""
@@ -27,7 +28,13 @@ class Daemon:
  def once(self):
   runner=JobRunner(self.db,self.continuity_id,self.continuity_source)
   try:
+   if self.continuity_id and not self.stats["continuity_recovered"]:
+    runner.recover()
+    self.stats["continuity_recovered"]=True
    result=runner.run_once(self.agent,self.mandate)
+   if self.continuity_id:
+    checkpoint=runner.checkpoint()
+    self.stats["checkpoint_id"]=checkpoint["checkpoint_id"]
    self.stats["ticks"]+=1
    if result:self.stats["completed"]+=1
    return result
