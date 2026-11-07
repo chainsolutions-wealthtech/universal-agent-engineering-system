@@ -24,15 +24,19 @@ class JobRunner:
     def run_once(self,agent_id,mandate_id):
         now=time.time()
         # Recover only local deterministic actions; no unknown external effect replay.
-        rows=self.engine.db.execute("""SELECT id,action FROM tasks WHERE state='READY'
-          OR (state='CLAIMED' AND claim_expiry<=?) ORDER BY rowid LIMIT 50""",(now,)).fetchall()
+        if self.continuity_id:
+            # Apply continuity eligibility before LIMIT; otherwise 50 unrelated
+            # READY tasks can starve a later bound task indefinitely.
+            rows=self.engine.db.execute("""SELECT t.id,t.action FROM tasks AS t
+              WHERE (t.state='READY' OR (t.state='CLAIMED' AND t.claim_expiry<=?))
+              AND EXISTS (SELECT 1 FROM continuity_links AS l
+                WHERE l.continuity_id=? AND l.kind='task' AND l.object_id=t.id)
+              ORDER BY t.rowid LIMIT 50""",(now,self.continuity_id)).fetchall()
+        else:
+            # Preserve the original unscoped runner selection semantics.
+            rows=self.engine.db.execute("""SELECT id,action FROM tasks WHERE state='READY'
+              OR (state='CLAIMED' AND claim_expiry<=?) ORDER BY rowid LIMIT 50""",(now,)).fetchall()
         for tid,action in rows:
-            if self.continuity_id:
-                bound=self.engine.db.execute(
-                    "SELECT 1 FROM continuity_links WHERE continuity_id=? AND kind='task' AND object_id=?",
-                    (self.continuity_id,tid)).fetchone()
-                if not bound:
-                    continue
             if action not in ("analyze","validate"): continue
             has_effect=self.engine.db.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name='effects'").fetchone()
