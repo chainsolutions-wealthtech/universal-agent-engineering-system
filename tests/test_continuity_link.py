@@ -37,6 +37,31 @@ class ContinuityTests(unittest.TestCase):
         self.assertEqual(resumed.db.execute(
             "SELECT COUNT(*) FROM tasks WHERE id=?",(task,)).fetchone()[0],1)
 
+    def test_runner_resumes_only_bound_tasks_after_restart(self):
+        from src.job_runner import JobRunner
+        e = self.engine
+        agent = e.agent("authorized-agent")
+        mandate = e.mandate(agent,"project-x","analyze")
+        bound = e.submit("project-x","analyze",{"bound":True})
+        from src.uaes_core import Engine
+        legacy = Engine(self.path)
+        unbound = legacy.submit("project-y","analyze",{"unbound":True})
+        legacy.db.close()
+        e.db.close()
+        runner = JobRunner(self.path,ROOT_ID,ROOT_SOURCE)
+        try:
+            item = runner.run_once(agent,mandate)
+            self.assertEqual(item["task_id"],bound)
+            self.assertIsNone(runner.run_once(agent,mandate))
+            self.assertEqual(runner.engine.db.execute(
+                "SELECT state FROM tasks WHERE id=?",(unbound,)).fetchone()[0],"READY")
+            self.assertEqual(runner.engine.resume()["tasks"][0]["state"],"DONE")
+            runner.engine.checkpoint()
+        finally:
+            runner.close()
+        self.engine = ContinuityEngine(self.path)
+        self.assertIsNotNone(self.engine.resume()["checkpoint"])
+
     def test_idempotent_link_and_no_parallel_task(self):
         e=self.engine
         task=e.submit("project-b","validate",{})
