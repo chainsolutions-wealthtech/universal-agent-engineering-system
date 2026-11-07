@@ -104,7 +104,7 @@ class RunnerTests(unittest.TestCase):
    runner.close()
 
  def test_effect_blocked_tasks_do_not_starve_eligible_continuity_task(self):
-  """Fifty linked, mandated effect-bound tasks cannot hide a later safe linked task."""
+  """Fifty distinct effect-bound projects do not block a later mandated linked task."""
   from src.continuity_link import ROOT_ID
   with tempfile.TemporaryDirectory() as folder:
    runner=JobRunner(Path(folder)/"db.sqlite",continuity_id=ROOT_ID)
@@ -112,7 +112,7 @@ class RunnerTests(unittest.TestCase):
    mandate=runner.engine.mandate(agent,"shared-project","analyze")
    journal=EffectJournal(runner.engine.db)
    for index in range(50):
-    tid=runner.engine.submit("shared-project","analyze",{"index":index})
+    tid=runner.engine.submit(f"blocked-project-{index}","analyze",{"index":index})
     eid=journal.prepare(tid,"remote","mutation",f"continuity-blocked-{index}")
     journal.dispatch(eid)
    eligible=runner.engine.submit("shared-project","analyze",{"safe":True})
