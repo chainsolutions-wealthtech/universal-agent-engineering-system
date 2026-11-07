@@ -62,6 +62,35 @@ class ContinuityTests(unittest.TestCase):
         self.engine = ContinuityEngine(self.path)
         self.assertIsNotNone(self.engine.resume()["checkpoint"])
 
+    def test_link_failure_rolls_back_task_and_event(self):
+        e=self.engine
+        before=e.db.execute("SELECT COUNT(*) FROM events").fetchone()[0]
+        original=e.link
+        def fail(kind, object_id):
+            if kind == "task":
+                raise RuntimeError("simulated correlation failure")
+            return original(kind,object_id)
+        e.link=fail
+        with self.assertRaises(RuntimeError):
+            e.submit("project-rollback","analyze",{})
+        e.link=original
+        self.assertEqual(e.db.execute("SELECT COUNT(*) FROM tasks").fetchone()[0],0)
+        self.assertEqual(e.db.execute("SELECT COUNT(*) FROM events").fetchone()[0],before)
+
+    def test_checkpoint_failure_rolls_back_snapshot(self):
+        e=self.engine
+        original=e.link
+        def fail(kind, object_id):
+            if kind == "checkpoint":
+                raise RuntimeError("simulated checkpoint failure")
+            return original(kind,object_id)
+        e.link=fail
+        with self.assertRaises(RuntimeError):
+            e.checkpoint()
+        e.link=original
+        self.assertEqual(e.db.execute(
+            "SELECT COUNT(*) FROM continuity_checkpoints").fetchone()[0],0)
+
     def test_idempotent_link_and_no_parallel_task(self):
         e=self.engine
         task=e.submit("project-b","validate",{})
