@@ -31,4 +31,28 @@ class RunnerTests(unittest.TestCase):
    journal.dispatch(eid)
    self.assertIsNone(runner.run_once(a,m))
    runner.close()
+ def test_continuity_filter_precedes_bounded_candidate_limit(self):
+  """A bound 51st task must not starve behind 50 unrelated READY tasks."""
+  from src.uaes_core import Engine
+  from src.continuity_link import ROOT_ID
+  with tempfile.TemporaryDirectory() as folder:
+   file=Path(folder)/"db.sqlite"
+   legacy=Engine(file)
+   for index in range(50):
+    legacy.submit(f"unrelated-{index}","analyze",{"index":index})
+   legacy.db.close()
+   runner=JobRunner(file,continuity_id=ROOT_ID)
+   agent=runner.engine.agent("continuity-agent")
+   mandate=runner.engine.mandate(agent,"eligible-project","analyze")
+   eligible=runner.engine.submit("eligible-project","analyze",{"expected":"bound"})
+   self.assertEqual(runner.engine.db.execute(
+       "SELECT COUNT(*) FROM tasks WHERE state='READY'").fetchone()[0],51)
+   result=runner.run_once(agent,mandate)
+   self.assertIsNotNone(result)
+   self.assertEqual(result["task_id"],eligible)
+   self.assertEqual(runner.engine.db.execute(
+       "SELECT state FROM tasks WHERE id=?",(eligible,)).fetchone()[0],"DONE")
+   self.assertEqual(runner.engine.db.execute(
+       "SELECT COUNT(*) FROM tasks WHERE state='READY'").fetchone()[0],50)
+   runner.close()
 if __name__=="__main__":unittest.main()
