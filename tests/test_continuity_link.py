@@ -1,0 +1,69 @@
+"""Regression tests for additive UAES continuity correlation."""
+import sqlite3
+import tempfile
+import unittest
+from pathlib import Path
+from src.continuity_link import ContinuityEngine, ROOT_ID, ROOT_SOURCE
+
+class ContinuityTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.path = Path(self.tmp.name) / "uaes.sqlite"
+        self.engine = ContinuityEngine(self.path)
+
+    def tearDown(self):
+        self.engine.db.close()
+        self.tmp.cleanup()
+
+    def test_end_to_end_restart_and_existing_authority(self):
+        e = self.engine
+        agent = e.agent("coding-agent")
+        mandate = e.mandate(agent,"project-a","analyze")
+        task = e.submit("project-a","analyze",{"value":1})
+        fencing = e.claim(task,agent,mandate)
+        e.complete(task,agent,fencing,{"ok":True})
+        checkpoint = e.checkpoint()
+        self.assertEqual(checkpoint["continuity_id"],ROOT_ID)
+        self.assertGreater(checkpoint["event_watermark"],0)
+        e.db.close()
+        resumed = ContinuityEngine(self.path)
+        self.engine = resumed
+        result = resumed.resume()
+        self.assertEqual(result["source"],ROOT_SOURCE)
+        self.assertEqual(result["tasks"][0]["state"],"DONE")
+        self.assertEqual(result["checkpoint"]["id"],checkpoint["checkpoint_id"])
+        kinds = {item["kind"] for item in result["links"]}
+        self.assertTrue({"agent","mandate","task","event","checkpoint"} <= kinds)
+        self.assertEqual(resumed.db.execute(
+            "SELECT COUNT(*) FROM tasks WHERE id=?",(task,)).fetchone()[0],1)
+
+    def test_idempotent_link_and_no_parallel_task(self):
+        e=self.engine
+        task=e.submit("project-b","validate",{})
+        e.bind_existing("task",task)
+        e.bind_existing("task",task)
+        self.assertEqual(e.db.execute(
+            "SELECT COUNT(*) FROM continuity_links WHERE kind='task' AND object_id=?",
+            (task,)).fetchone()[0],1)
+        self.assertEqual(e.db.execute("SELECT COUNT(*) FROM tasks").fetchone()[0],1)
+
+    def test_missing_local_authority_fails_closed(self):
+        with self.assertRaises(ValueError):
+            self.engine.bind_existing("task","invented-task")
+        with self.assertRaises(ValueError):
+            self.engine.bind_existing("agent","invented-agent")
+
+    def test_reject_rebinding_source(self):
+        with self.assertRaises(ValueError):
+            ContinuityEngine(self.path,ROOT_ID,"https://example.org/other")
+
+    def test_original_engine_can_read_additive_schema(self):
+        from src.uaes_core import Engine
+        old=Engine(self.path)
+        try:
+            self.assertIn("tasks",old.checkpoint())
+        finally:
+            old.db.close()
+
+if __name__ == "__main__":
+    unittest.main()
