@@ -44,10 +44,16 @@ class JobRunner:
               """ + effect_filter + """ ORDER BY t.rowid LIMIT 50""",
               (now,self.continuity_id,mandate_id,agent_id,now)).fetchall()
         else:
-            # Preserve the original unscoped runner selection semantics.
+            # Preserve unscoped operation, but prefilter the current mandate
+            # before LIMIT; Engine.claim() remains the final authorization gate.
             rows=self.engine.db.execute("""SELECT t.id,t.action FROM tasks AS t WHERE (t.state='READY'
               OR (t.state='CLAIMED' AND t.claim_expiry<=?))
-              """ + effect_filter + """ ORDER BY t.rowid LIMIT 50""",(now,)).fetchall()
+              AND EXISTS (SELECT 1 FROM mandates AS m
+                WHERE m.id=? AND m.agent_id=? AND m.project_id=t.project_id
+                AND m.scope=t.action AND m.revoked=0 AND m.expires>?)
+              AND t.action IN ('analyze','validate')
+              """ + effect_filter + """ ORDER BY t.rowid LIMIT 50""",
+              (now,mandate_id,agent_id,now)).fetchall()
         for tid,action in rows:
             if action not in ("analyze","validate"): continue
             if has_effect and self.engine.db.execute(
