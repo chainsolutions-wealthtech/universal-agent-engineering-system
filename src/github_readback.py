@@ -37,7 +37,8 @@ class GitHubCommitReadback:
                 payload = json.load(response)
         except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, ValueError):
             return None
-        if not isinstance(payload, dict) or payload.get("sha", "").lower() != key.lower():
+        if (not isinstance(payload, dict) or not isinstance(payload.get("sha"), str)
+                or payload["sha"].lower() != key.lower()):
             return None
         # Reference is bound to the provider response and verified commit identity.
         return VerifiedObservation(
