@@ -71,4 +71,28 @@ class RunnerTests(unittest.TestCase):
    self.assertEqual(runner.engine.db.execute(
        "SELECT COUNT(*) FROM tasks WHERE state='READY'").fetchone()[0],50)
    runner.close()
+ def test_effect_blocked_tasks_do_not_starve_eligible_continuity_task(self):
+  """Fifty bound tasks with effect receipts cannot hide a later safe task."""
+  from src.continuity_link import ROOT_ID
+  with tempfile.TemporaryDirectory() as folder:
+   runner=JobRunner(Path(folder)/"db.sqlite",continuity_id=ROOT_ID)
+   agent=runner.engine.agent("effect-safe-agent")
+   mandate=runner.engine.mandate(agent,"effect-project","analyze")
+   journal=EffectJournal(runner.engine.db)
+   for index in range(50):
+    tid=runner.engine.submit("effect-project","analyze",{"index":index}) if index==0 else None
+    # Core enforces UNIQUE(project_id,action); use distinct eligible projects
+    # with independent mandates, then select the single final eligible project.
+    if tid is None:
+     tid=runner.engine.submit(f"blocked-project-{index}","analyze",{"index":index})
+    eid=journal.prepare(tid,"remote","mutation",f"blocked-key-{index}")
+    journal.dispatch(eid)
+   eligible=runner.engine.submit("eligible-project","analyze",{"safe":True})
+   eligible_mandate=runner.engine.mandate(agent,"eligible-project","analyze")
+   result=runner.run_once(agent,eligible_mandate)
+   self.assertIsNotNone(result)
+   self.assertEqual(result["task_id"],eligible)
+   self.assertEqual(runner.engine.db.execute("SELECT COUNT(*) FROM tasks WHERE state='READY'").fetchone()[0],50)
+   runner.close()
+
 if __name__=="__main__":unittest.main()
