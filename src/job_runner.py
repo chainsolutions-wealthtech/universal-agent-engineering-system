@@ -9,6 +9,18 @@ class JobRunner:
         self.engine=(ContinuityEngine(db_path,continuity_id,continuity_source or ROOT_SOURCE)
                      if continuity_id else Engine(db_path))
         self.continuity_id=continuity_id
+    def recover(self):
+        """Read local continuity after restart; never auto-authorize/replay."""
+        if not self.continuity_id:
+            return None
+        return self.engine.resume()
+
+    def checkpoint(self):
+        """Persist an atomic local continuity checkpoint if enabled."""
+        if not self.continuity_id:
+            return None
+        return self.engine.checkpoint()
+
     def run_once(self,agent_id,mandate_id):
         now=time.time()
         # Recover only local deterministic actions; no unknown external effect replay.
