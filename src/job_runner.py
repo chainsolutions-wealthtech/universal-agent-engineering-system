@@ -26,12 +26,17 @@ class JobRunner:
         # Recover only local deterministic actions; no unknown external effect replay.
         if self.continuity_id:
             # Apply continuity eligibility before LIMIT; otherwise 50 unrelated
-            # READY tasks can starve a later bound task indefinitely.
+            # READY tasks can starve a later bound task indefinitely. Also apply\n            # the effective mandate before LIMIT so unrelated bound tasks cannot\n            # starve the eligible project; claim() still enforces authority.
             rows=self.engine.db.execute("""SELECT t.id,t.action FROM tasks AS t
               WHERE (t.state='READY' OR (t.state='CLAIMED' AND t.claim_expiry<=?))
               AND EXISTS (SELECT 1 FROM continuity_links AS l
                 WHERE l.continuity_id=? AND l.kind='task' AND l.object_id=t.id)
-              ORDER BY t.rowid LIMIT 50""",(now,self.continuity_id)).fetchall()
+              AND EXISTS (SELECT 1 FROM mandates AS m
+                WHERE m.id=? AND m.agent_id=? AND m.project_id=t.project_id
+                AND m.scope=t.action AND m.revoked=0 AND m.expires>?)
+              AND t.action IN ('analyze','validate')
+              ORDER BY t.rowid LIMIT 50""",
+              (now,self.continuity_id,mandate_id,agent_id,now)).fetchall()
         else:
             # Preserve the original unscoped runner selection semantics.
             rows=self.engine.db.execute("""SELECT id,action FROM tasks WHERE state='READY'
