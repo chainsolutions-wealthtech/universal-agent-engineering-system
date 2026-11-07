@@ -80,36 +80,54 @@ class ContinuityEngine(Engine):
         seq = self.db.execute("SELECT last_insert_rowid()").fetchone()[0]
         self.link("event",seq)
 
+    def _write_with_link(self, kind, operation):
+        """Commit authority row, original event and correlation as one unit."""
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            object_id = operation()
+            self.link(kind, object_id)
+            self.db.execute("COMMIT")
+            return object_id
+        except BaseException:
+            self.db.execute("ROLLBACK")
+            raise
+
     def agent(self, label, agent_id=None):
-        aid = super().agent(label,agent_id)
-        self.link("agent",aid)
-        return aid
+        return self._write_with_link(
+            "agent", lambda: super(ContinuityEngine, self).agent(label, agent_id))
 
     def mandate(self, agent_id, project_id, scope, ttl=3600):
-        mid = super().mandate(agent_id,project_id,scope,ttl)
-        self.link("mandate",mid)
-        return mid
+        return self._write_with_link(
+            "mandate", lambda: super(ContinuityEngine, self).mandate(
+                agent_id, project_id, scope, ttl))
 
     def submit(self, project_id, action, payload):
-        tid = super().submit(project_id,action,payload)
-        self.link("task",tid)
-        return tid
+        return self._write_with_link(
+            "task", lambda: super(ContinuityEngine, self).submit(
+                project_id, action, payload))
 
     def bind_existing(self, kind, object_id):
         """Opt-in migration of legacy rows; never silently claim their history."""
         self.link(kind,object_id)
 
     def checkpoint(self):
-        # Existing Engine checkpoint stays authoritative for task-state counts.
-        current = super().checkpoint()
-        watermark = self.db.execute("SELECT COALESCE(MAX(seq),0) FROM events").fetchone()[0]
-        snapshot = {"core":current,"event_watermark":watermark,
-                    "continuity_id":self.continuity_id}
-        cur = self.db.execute(
-            "INSERT INTO continuity_checkpoints(continuity_id,event_watermark,snapshot,recorded) VALUES(?,?,?,?)",
-            (self.continuity_id,watermark,json.dumps(snapshot,sort_keys=True),time.time()))
-        self.link("checkpoint",cur.lastrowid)
-        return {"checkpoint_id":cur.lastrowid,**snapshot}
+        """Atomically persist a snapshot and its correlation."""
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            current = super().checkpoint()
+            watermark = self.db.execute(
+                "SELECT COALESCE(MAX(seq),0) FROM events").fetchone()[0]
+            snapshot = {"core":current,"event_watermark":watermark,
+                        "continuity_id":self.continuity_id}
+            cur = self.db.execute(
+                "INSERT INTO continuity_checkpoints(continuity_id,event_watermark,snapshot,recorded) VALUES(?,?,?,?)",
+                (self.continuity_id,watermark,json.dumps(snapshot,sort_keys=True),time.time()))
+            self.link("checkpoint",cur.lastrowid)
+            self.db.execute("COMMIT")
+            return {"checkpoint_id":cur.lastrowid,**snapshot}
+        except BaseException:
+            self.db.execute("ROLLBACK")
+            raise
 
     def resume(self):
         """Read-only continuity projection; does not claim work or replay effects."""
