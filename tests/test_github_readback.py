@@ -41,6 +41,20 @@ class GitHubReadbackTests(unittest.TestCase):
             adapter.readback("example/fixture","create_issue",SHA)
         with self.assertRaises(PermissionError):
             adapter.readback("https://other.invalid/x","commit_exists",SHA)
+    def test_malformed_commit_sha_fails_closed_without_exception(self):
+        for payload in ({}, {"sha": None}, {"sha": 123}, {"sha": []}, {"sha": {}}):
+            with self.subTest(payload=payload):
+                adapter = GitHubCommitReadback(
+                    lambda: "test-only-token",
+                    lambda req, timeout: _Response(json.dumps(payload).encode()),
+                )
+                result = ReadbackVerifier(adapter).inspect({
+                    "target": "example/fixture",
+                    "operation": "commit_exists",
+                    "idempotency_key": SHA,
+                })
+                self.assertEqual(result["status"], "UNKNOWN")
+
     def test_wrong_commit_sha_never_confirmed(self):
         adapter=GitHubCommitReadback(lambda:"test",lambda req,timeout:_Response(json.dumps({"sha":"b"*40}).encode()))
         self.assertEqual(ReadbackVerifier(adapter).inspect({
