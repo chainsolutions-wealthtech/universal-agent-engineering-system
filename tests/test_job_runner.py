@@ -147,4 +147,26 @@ class RunnerTests(unittest.TestCase):
        "SELECT COUNT(*) FROM tasks WHERE state='READY'").fetchone()[0],50)
    runner.close()
 
+ def test_restart_preserves_revoked_mandate_and_does_not_claim_task(self):
+  """A restarted worker must not revive authorization revoked before shutdown."""
+  with tempfile.TemporaryDirectory() as folder:
+   file=Path(folder)/"db.sqlite"
+   runner=JobRunner(file)
+   agent=runner.engine.agent("revoked-restart-agent")
+   mandate=runner.engine.mandate(agent,"revoked-project","analyze")
+   task=runner.engine.submit("revoked-project","analyze",{"safe":True})
+   runner.engine.revoke(mandate)
+   runner.close()
+   runner=JobRunner(file)
+   self.assertIsNone(runner.run_once(agent,mandate))
+   self.assertEqual(runner.engine.db.execute(
+       "SELECT state FROM tasks WHERE id=?",(task,)).fetchone()[0],"READY")
+   self.assertEqual(runner.engine.db.execute(
+       "SELECT COUNT(*) FROM events WHERE kind='task.claimed' AND subject=?",
+       (task,)).fetchone()[0],0)
+   self.assertEqual(runner.engine.db.execute(
+       "SELECT COUNT(*) FROM events WHERE kind='task.completed' AND subject=?",
+       (task,)).fetchone()[0],0)
+   runner.close()
+
 if __name__=="__main__":unittest.main()
