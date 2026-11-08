@@ -41,6 +41,20 @@ class GitHubReadbackTests(unittest.TestCase):
             adapter.readback("example/fixture","create_issue",SHA)
         with self.assertRaises(PermissionError):
             adapter.readback("https://other.invalid/x","commit_exists",SHA)
+    def test_malformed_commit_sha_fails_closed_without_exception(self):
+        for payload in ({}, {"sha": None}, {"sha": 123}, {"sha": []}, {"sha": {}}):
+            with self.subTest(payload=payload):
+                adapter = GitHubCommitReadback(
+                    lambda: "test-only-token",
+                    lambda req, timeout: _Response(json.dumps(payload).encode()),
+                )
+                result = ReadbackVerifier(adapter).inspect({
+                    "target": "example/fixture",
+                    "operation": "commit_exists",
+                    "idempotency_key": SHA,
+                })
+                self.assertEqual(result["status"], "UNKNOWN")
+
     def test_wrong_commit_sha_never_confirmed(self):
         adapter=GitHubCommitReadback(lambda:"test",lambda req,timeout:_Response(json.dumps({"sha":"b"*40}).encode()))
         self.assertEqual(ReadbackVerifier(adapter).inspect({
@@ -80,6 +94,21 @@ class RepositorySnapshotTests(unittest.TestCase):
         self.assertEqual(classify_repository_snapshot(repo, branch, pull, checks, None)["reason"], "RULESETS_UNVERIFIED")
         branch["protected"] = None
         self.assertEqual(classify_repository_snapshot(repo, branch, pull, checks, rules)["reason"], "BRANCH_PROTECTION_UNVERIFIED")
+
+    def test_malformed_provider_check_sha_is_ignored_not_crashed(self):
+        repo, branch, pull, checks, rules = self.fixture()
+        checks.extend([
+            {"id": 6, "name": "core-tests", "head_sha": None,
+             "status": "completed", "conclusion": "success"},
+            {"id": 7, "name": "core-tests", "head_sha": 123,
+             "status": "completed", "conclusion": "success"},
+            {"id": 8, "name": "core-tests",
+             "status": "completed", "conclusion": "success"},
+        ])
+        result = classify_repository_snapshot(repo, branch, pull, checks, rules)
+        self.assertEqual(result["status"], "OBSERVED")
+        self.assertEqual(result["check_runs_latest"]["core-tests"]["id"], 4)
+        self.assertEqual(result["check_runs_latest"]["core-tests"]["conclusion"], "failure")
 
     def test_unrequested_pull_does_not_fabricate_checks(self):
         repo, branch, pull, checks, rules = self.fixture()
