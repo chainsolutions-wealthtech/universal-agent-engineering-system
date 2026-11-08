@@ -31,6 +31,30 @@ class RunnerTests(unittest.TestCase):
    journal.dispatch(eid)
    self.assertIsNone(runner.run_once(a,m))
    runner.close()
+ def test_restart_preserves_uncertain_effect_and_runs_later_safe_task(self):
+  """A restarted worker must not replay an uncertain effect or starve safe work."""
+  with tempfile.TemporaryDirectory() as folder:
+   file=Path(folder)/"db.sqlite"
+   runner=JobRunner(file)
+   agent=runner.engine.agent("restart-effect-agent")
+   blocked=runner.engine.submit("blocked-project","analyze",{"unsafe":True})
+   journal=EffectJournal(runner.engine.db)
+   effect=journal.prepare(blocked,"remote","mutation","restart-effect-key")
+   journal.dispatch(effect)
+   runner.close()
+   runner=JobRunner(file)
+   mandate=runner.engine.mandate(agent,"safe-project","analyze")
+   safe=runner.engine.submit("safe-project","analyze",{"safe":True})
+   result=runner.run_once(agent,mandate)
+   self.assertIsNotNone(result)
+   self.assertEqual(result["task_id"],safe)
+   self.assertEqual(runner.engine.db.execute(
+       "SELECT state FROM tasks WHERE id=?",(blocked,)).fetchone()[0],"READY")
+   self.assertEqual(runner.engine.db.execute(
+       "SELECT COUNT(*) FROM effects WHERE task_id=?",(blocked,)).fetchone()[0],1)
+   self.assertEqual(runner.engine.db.execute(
+       "SELECT COUNT(*) FROM events WHERE kind='task.completed'").fetchone()[0],1)
+   runner.close()
  def test_continuity_filter_precedes_bounded_candidate_limit(self):
   """A bound 51st task must not starve behind 50 unrelated READY tasks."""
   from src.uaes_core import Engine
