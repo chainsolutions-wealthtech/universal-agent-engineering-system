@@ -37,7 +37,8 @@ class GitHubCommitReadback:
                 payload = json.load(response)
         except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, ValueError):
             return None
-        if not isinstance(payload, dict) or payload.get("sha", "").lower() != key.lower():
+        if (not isinstance(payload, dict) or not isinstance(payload.get("sha"), str)
+                or payload["sha"].lower() != key.lower()):
             return None
         # Reference is bound to the provider response and verified commit identity.
         return VerifiedObservation(
@@ -86,7 +87,7 @@ def classify_repository_snapshot(repository, branch, pull, check_runs, rulesets)
                 "repository": name, "head_sha": head_sha.lower()}
     checks = {}
     for run in check_runs:
-        if not isinstance(run, dict) or run.get("head_sha", "").lower() != head_sha.lower():
+        if not isinstance(run, dict) or not isinstance(run.get("head_sha"), str) or run["head_sha"].lower() != head_sha.lower():
             continue
         name_check = run.get("name")
         run_id = run.get("id")
