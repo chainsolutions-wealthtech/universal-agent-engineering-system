@@ -223,9 +223,20 @@ def ensure_ruleset(client, configuration, actors):
     verify_effective_rules(verified_branch, effective, ruleset_id)
     verified_detail = client.request("GET", base + "/rulesets/" + str(ruleset_id))
     verify_effective_bypass(verified_detail, actors)
+    # A successful initial preflight can become stale if another actor pushes
+    # while the native policy is being applied. Re-read PR and checks.
+    final_pull = client.request("GET", base + "/pulls/1")
+    if (not isinstance(final_pull, dict)
+            or not isinstance(final_pull.get("head"), dict)
+            or final_pull["head"].get("sha") != sha):
+        raise RulesetGateError("PR_HEAD_CHANGED_AFTER_RULESET")
+    final_checks = client.request(
+        "GET", base + "/commits/" + sha + "/check-runs?per_page=100")
+    validate_current_head_checks(final_pull, (final_checks or {}).get("check_runs"))
     return {"status": "VERIFIED_ENFORCED", "operation": operation,
             "repository": REPOSITORY, "ruleset_id": ruleset_id,
-            "pr_head_sha_at_preflight": sha, "required_checks": list(REQUIRED_JOBS),
+            "pr_head_sha_at_preflight": sha, "pr_head_sha_at_attestation": sha,
+            "required_checks": list(REQUIRED_JOBS),
             "required_human_approvals": 0, "branch": "main",
             "verified_bypass_actor_count": len(actors), "bypass_mode": "always"}
 
