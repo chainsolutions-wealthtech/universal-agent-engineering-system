@@ -107,6 +107,14 @@ def verify_bypass_principals(client, config):
             ]
             if len(eligible) != 1:
                 raise BypassPolicyError("TARGET_ORGANIZATION_INSTALLATION_UNVERIFIED")
+            # Verify live installation permissions, not just account membership.
+            # Bypass rules do not confer write access; the App must already
+            # have provider-granted Contents and Pull requests write rights.
+            granted = eligible[0].get("permissions")
+            if not isinstance(granted, dict):
+                raise BypassPolicyError("APP_GRANTED_PERMISSIONS_UNVERIFIED")
+            if granted.get("contents") != "write" or granted.get("pull_requests") != "write":
+                raise BypassPolicyError("APP_REQUIRED_WRITE_GRANTS_MISSING")
             installation_id = eligible[0].get("id")
             if type(installation_id) is not int:
                 raise BypassPolicyError("INSTALLATION_ID_UNVERIFIED")
