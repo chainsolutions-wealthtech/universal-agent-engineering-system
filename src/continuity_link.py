@@ -69,6 +69,14 @@ class ContinuityEngine(Engine):
                 raise ValueError("local authority table unavailable") from exc
             if not found:
                 raise ValueError("cannot link missing local authority")
+        if kind == "checkpoint":
+            # A checkpoint belongs to exactly one continuity root; a
+            # documentary link cannot import another root's state.
+            found = self.db.execute(
+                "SELECT 1 FROM continuity_checkpoints WHERE id=? AND continuity_id=?",
+                (object_id, self.continuity_id)).fetchone()
+            if not found:
+                raise ValueError("cannot link missing or foreign continuity checkpoint")
         self.db.execute(
             "INSERT OR IGNORE INTO continuity_links VALUES(?,?,?,?)",
             (self.continuity_id,kind,str(object_id),time.time()))
@@ -100,6 +108,16 @@ class ContinuityEngine(Engine):
         return self._write_with_link(
             "mandate", lambda: super(ContinuityEngine, self).mandate(
                 agent_id, project_id, scope, ttl))
+
+    def revoke(self, mid):
+        """Keep mandate revocation and its correlated event atomic."""
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            super().revoke(mid)
+            self.db.execute("COMMIT")
+        except BaseException:
+            self.db.execute("ROLLBACK")
+            raise
 
     def submit(self, project_id, action, payload):
         return self._write_with_link(
