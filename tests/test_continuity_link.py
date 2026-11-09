@@ -142,8 +142,11 @@ class ContinuityTests(unittest.TestCase):
             another.db.close()
         with self.assertRaises(ValueError):
             e.bind_existing("checkpoint", foreign_checkpoint)
+        # Another root legitimately stores its own checkpoint link. Only
+        # the current root must remain unchanged by rejected foreign binds.
         self.assertEqual(e.db.execute(
-            "SELECT COUNT(*) FROM continuity_links WHERE kind='checkpoint'").fetchone()[0], 0)
+            "SELECT COUNT(*) FROM continuity_links WHERE kind='checkpoint' AND continuity_id=?",
+            (e.continuity_id,)).fetchone()[0], 0)
 
     def test_revoke_event_link_failure_rolls_back_revocation(self):
         e = self.engine
