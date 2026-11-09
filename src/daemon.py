@@ -4,10 +4,12 @@ from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 from src.job_runner import JobRunner
 
 class Daemon:
- def __init__(self,db,agent,mandate,interval=5):
+ def __init__(self,db,agent,mandate,interval=5,continuity_id=None,continuity_source=None):
   self.db,self.agent,self.mandate,self.interval=db,agent,mandate,interval
+  self.continuity_id,self.continuity_source=continuity_id,continuity_source
   self.stop_event=threading.Event()
-  self.stats={"ticks":0,"completed":0,"failures":0,"last_error":None}
+  self.stats={"ticks":0,"completed":0,"failures":0,"last_error":None,
+              "continuity_recovered":False,"checkpoint_id":None}
 
  def readiness(self):
   """Readiness is based on current local authority, not merely configured IDs."""
@@ -24,9 +26,15 @@ class Daemon:
    return False
 
  def once(self):
-  runner=JobRunner(self.db)
+  runner=JobRunner(self.db,self.continuity_id,self.continuity_source)
   try:
+   if self.continuity_id and not self.stats["continuity_recovered"]:
+    runner.recover()
+    self.stats["continuity_recovered"]=True
    result=runner.run_once(self.agent,self.mandate)
+   if self.continuity_id:
+    checkpoint=runner.checkpoint()
+    self.stats["checkpoint_id"]=checkpoint["checkpoint_id"]
    self.stats["ticks"]+=1
    if result:self.stats["completed"]+=1
    return result
@@ -66,10 +74,12 @@ def main():
  p.add_argument("--agent",default=os.environ.get("UAES_AGENT_ID"))
  p.add_argument("--mandate",default=os.environ.get("UAES_MANDATE_ID"))
  p.add_argument("--interval",type=float,default=5)
+ p.add_argument("--continuity-id",default=os.environ.get("UAES_CONTINUITY_ID"))
+ p.add_argument("--continuity-source",default=os.environ.get("UAES_CONTINUITY_SOURCE"))
  p.add_argument("--max-iterations",type=int,default=None)
  a=p.parse_args()
  if not a.agent or not a.mandate:raise SystemExit("configured agent and mandate required; cannot invent runtime identity")
- daemon=Daemon(a.db,a.agent,a.mandate,a.interval)
+ daemon=Daemon(a.db,a.agent,a.mandate,a.interval,a.continuity_id,a.continuity_source)
  server=health_server(daemon)
  try:
   signal.signal(signal.SIGTERM,lambda *_:daemon.stop_event.set())

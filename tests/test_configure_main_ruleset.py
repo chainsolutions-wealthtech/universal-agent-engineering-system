@@ -1,8 +1,10 @@
 """Offline tests for provider-enforced UAES main ruleset, no API or token needed."""
 import unittest
+from unittest.mock import patch
 from scripts.configure_main_ruleset import (
     GITHUB_ACTIONS_APP_ID, REQUIRED_JOBS, RulesetGateError,
     proposed_ruleset, validate_current_head_checks, verify_effective_rules, verify_effective_bypass,
+    ensure_ruleset,
 )
 
 SHA = "a" * 40
@@ -41,6 +43,25 @@ class RulesetTests(unittest.TestCase):
         reviews = next(r for r in config["rules"] if r["type"] == "pull_request")
         self.assertEqual(reviews["parameters"]["required_approving_review_count"], 0)
         self.assertFalse(reviews["parameters"]["require_code_owner_review"])
+
+    def test_import_recipe_matches_canonical_ruleset_without_dropping_rights(self):
+        # The optional native GitHub import JSON must not drift from the
+        # tested installer policy, especially the three 'always' actors.
+        import json
+        from pathlib import Path
+        root = Path(__file__).resolve().parents[1]
+        fixture = json.loads(
+            (root / "docs/U00_MAIN_RULESET_IMPORT.json").read_text(encoding="utf-8"))
+        candidate = [
+            {"actor_type": "User", "actor_id": 94637590, "bypass_mode": "always"},
+            {"actor_type": "User", "actor_id": 270385782, "bypass_mode": "always"},
+            {"actor_type": "Integration", "actor_id": 5417646, "bypass_mode": "always"},
+        ]
+        self.assertEqual(fixture, proposed_ruleset(candidate))
+        self.assertEqual(len(fixture["bypass_actors"]), 3)
+        self.assertEqual(fixture["conditions"]["ref_name"]["include"],
+                         ["refs/heads/main"])
+        self.assertEqual(fixture["enforcement"], "active")
 
     def test_provider_must_attest_exact_bypass_actor_count_and_identity(self):
         details = {"enforcement": "active", "bypass_actors": [dict(x) for x in ACTORS]}
@@ -85,6 +106,44 @@ class RulesetTests(unittest.TestCase):
                       "parameters": {"required_approving_review_count": 1}})
         with self.assertRaisesRegex(RulesetGateError, "EXTERNALLY_REQUIRED_APPROVAL"):
             verify_effective_rules({"protected": True}, rules, 9)
+
+    def test_post_apply_changed_pr_head_is_not_attested(self):
+        # A concurrent push between preflight and ruleset readback must
+        # invalidate the attestation, even when all previous checks passed.
+        class Client:
+            def __init__(self, change=True):
+                self.pull_reads = 0
+                self.applied = False
+                self.change = change
+            def request(self, method, path, data=None):
+                if path.endswith("/branches/main"):
+                    return {"commit": {"sha": SHA}, "protected": self.applied}
+                if path.endswith("/pulls/1"):
+                    self.pull_reads += 1
+                    current = valid_pull()
+                    if self.pull_reads > 1 and self.change:
+                        current["head"]["sha"] = "b" * 40
+                    return current
+                if "/check-runs?" in path:
+                    return {"check_runs": valid_checks()}
+                if "/rulesets?includes_parents=true" in path:
+                    return []
+                if "/rules/branches/main?" in path:
+                    return applied_rules() if self.applied else []
+                if path.endswith("/rulesets") and method == "POST":
+                    self.applied = True
+                    return {"id": 9}
+                if path.endswith("/rulesets/9"):
+                    return proposed_ruleset(ACTORS)
+                raise AssertionError("unexpected API request: " + method + " " + path)
+        with patch("scripts.configure_main_ruleset.verify_bypass_principals", return_value=True):
+            with self.assertRaisesRegex(RulesetGateError, "PR_HEAD_CHANGED_AFTER_RULESET"):
+                ensure_ruleset(Client(), {}, ACTORS)
+            valid_client = Client(change=False)
+            receipt = ensure_ruleset(valid_client, {}, ACTORS)
+            self.assertEqual(receipt["status"], "VERIFIED_ENFORCED")
+            self.assertEqual(receipt["pr_head_sha_at_attestation"], SHA)
+            self.assertEqual(valid_client.pull_reads, 2)
 
     def test_missing_check_context_or_app_cannot_certify_ruleset(self):
         rules = applied_rules()
