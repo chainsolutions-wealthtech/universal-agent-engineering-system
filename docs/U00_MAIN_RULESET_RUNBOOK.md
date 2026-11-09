@@ -4,6 +4,29 @@ This document specifies the **native GitHub administration** required before
 integrating bootstrap PR #1. It is not an authorization to bypass GitHub
 branch protections, organizational rules or applicable terms.
 
+## Current provider result — verified 2026-11-09
+
+**U00 COMPLETE.** This runbook's original installation instructions and
+2026-11-06 blocker are historical. The owner created ruleset
+[`26883048`](https://github.com/chainsolutions-wealthtech/universal-agent-engineering-system/settings/rules/26883048)
+through GitHub's native administrative UI. A fresh GitHub REST readback
+confirmed repository-level `enforcement=active`, `main.protected=true`,
+`refs/heads/main` target, `required_approving_review_count=0`, five required
+GitHub Actions checks bound to App ID `15368`, and the exact three
+`always` bypass records `User/94637590`, `User/270385782`,
+`Integration/5417646`. GitHub also confirmed PR #1 merge
+`c5172a7e85eed43732687bd63c2e5a290d4c97be` and PR #7 merge
+`91b6e5fb674c30a29ca07b7dc024db7671db9ade`. Do **not** rerun the
+bootstrap installer `--apply` as a means of checking an already merged PR
+#1: its historical bootstrap preflight intentionally requires that PR to
+remain open. For ongoing verification read the **native** GitHub ruleset,
+branch and Check Runs endpoints instead.
+
+**Important scope distinction:** the GitHub ruleset confirms the App's
+numeric Integration bypass principal; it is **not** evidence of the
+dedicated App's full installation permission matrix, token broker,
+hosted UAES worker, staging, backups or production autonomy. U02 is next.
+
 ## Required state
 
 - Repository: `chainsolutions-wealthtech/universal-agent-engineering-system`.
