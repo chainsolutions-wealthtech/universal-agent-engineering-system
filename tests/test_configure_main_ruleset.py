@@ -1,8 +1,10 @@
 """Offline tests for provider-enforced UAES main ruleset, no API or token needed."""
 import unittest
+from unittest.mock import patch
 from scripts.configure_main_ruleset import (
     GITHUB_ACTIONS_APP_ID, REQUIRED_JOBS, RulesetGateError,
     proposed_ruleset, validate_current_head_checks, verify_effective_rules, verify_effective_bypass,
+    ensure_ruleset,
 )
 
 SHA = "a" * 40
@@ -85,6 +87,38 @@ class RulesetTests(unittest.TestCase):
                       "parameters": {"required_approving_review_count": 1}})
         with self.assertRaisesRegex(RulesetGateError, "EXTERNALLY_REQUIRED_APPROVAL"):
             verify_effective_rules({"protected": True}, rules, 9)
+
+    def test_post_apply_changed_pr_head_is_not_attested(self):
+        # A concurrent push between preflight and ruleset readback must
+        # invalidate the attestation, even when all previous checks passed.
+        class Client:
+            def __init__(self):
+                self.pull_reads = 0
+                self.applied = False
+            def request(self, method, path, data=None):
+                if path.endswith("/branches/main"):
+                    return {"commit": {"sha": SHA}, "protected": self.applied}
+                if path.endswith("/pulls/1"):
+                    self.pull_reads += 1
+                    current = valid_pull()
+                    if self.pull_reads > 1:
+                        current["head"]["sha"] = "b" * 40
+                    return current
+                if "/check-runs?" in path:
+                    return {"check_runs": valid_checks()}
+                if "/rulesets?includes_parents=true" in path:
+                    return []
+                if "/rules/branches/main?" in path:
+                    return applied_rules() if self.applied else []
+                if path.endswith("/rulesets") and method == "POST":
+                    self.applied = True
+                    return {"id": 9}
+                if path.endswith("/rulesets/9"):
+                    return proposed_ruleset(ACTORS)
+                raise AssertionError("unexpected API request: " + method + " " + path)
+        with patch("scripts.configure_main_ruleset.verify_bypass_principals", return_value=True):
+            with self.assertRaisesRegex(RulesetGateError, "PR_HEAD_CHANGED_AFTER_RULESET"):
+                ensure_ruleset(Client(), {}, ACTORS)
 
     def test_missing_check_context_or_app_cannot_certify_ruleset(self):
         rules = applied_rules()
