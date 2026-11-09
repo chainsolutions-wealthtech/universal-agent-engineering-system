@@ -92,16 +92,17 @@ class RulesetTests(unittest.TestCase):
         # A concurrent push between preflight and ruleset readback must
         # invalidate the attestation, even when all previous checks passed.
         class Client:
-            def __init__(self):
+            def __init__(self, change=True):
                 self.pull_reads = 0
                 self.applied = False
+                self.change = change
             def request(self, method, path, data=None):
                 if path.endswith("/branches/main"):
                     return {"commit": {"sha": SHA}, "protected": self.applied}
                 if path.endswith("/pulls/1"):
                     self.pull_reads += 1
                     current = valid_pull()
-                    if self.pull_reads > 1:
+                    if self.pull_reads > 1 and self.change:
                         current["head"]["sha"] = "b" * 40
                     return current
                 if "/check-runs?" in path:
@@ -119,6 +120,11 @@ class RulesetTests(unittest.TestCase):
         with patch("scripts.configure_main_ruleset.verify_bypass_principals", return_value=True):
             with self.assertRaisesRegex(RulesetGateError, "PR_HEAD_CHANGED_AFTER_RULESET"):
                 ensure_ruleset(Client(), {}, ACTORS)
+            valid_client = Client(change=False)
+            receipt = ensure_ruleset(valid_client, {}, ACTORS)
+            self.assertEqual(receipt["status"], "VERIFIED_ENFORCED")
+            self.assertEqual(receipt["pr_head_sha_at_attestation"], SHA)
+            self.assertEqual(valid_client.pull_reads, 2)
 
     def test_missing_check_context_or_app_cannot_certify_ruleset(self):
         rules = applied_rules()
