@@ -175,6 +175,36 @@ class ContinuityTests(unittest.TestCase):
                WHERE l.kind='event' AND v.kind='mandate.revoked' AND v.subject=?""",
             (mandate,)).fetchone()[0], 1)
 
+    def test_resume_rejects_checkpoint_with_wrong_root_and_watermark(self):
+        e = self.engine
+        e.checkpoint()
+        checkpoint_id = e.db.execute(
+            "SELECT MAX(id) FROM continuity_checkpoints").fetchone()[0]
+        original = e.db.execute(
+            "SELECT snapshot,event_watermark FROM continuity_checkpoints WHERE id=?",
+            (checkpoint_id,)).fetchone()
+        import json
+        forged = json.loads(original[0])
+        forged["continuity_id"] = "foreign-root"
+        e.db.execute("UPDATE continuity_checkpoints SET snapshot=? WHERE id=?",
+                     (json.dumps(forged), checkpoint_id))
+        with self.assertRaisesRegex(ValueError, "CHECKPOINT_PROVENANCE_MISMATCH"):
+            e.resume()
+        e.db.execute("UPDATE continuity_checkpoints SET snapshot=? WHERE id=?",
+                     (original[0], checkpoint_id))
+        e.db.execute(
+            "UPDATE continuity_checkpoints SET event_watermark=? WHERE id=?",
+            (original[1] + 1, checkpoint_id))
+        with self.assertRaisesRegex(ValueError, "CHECKPOINT_PROVENANCE_MISMATCH"):
+            e.resume()
+
+    def test_revocation_of_unknown_mandate_never_creates_event(self):
+        e = self.engine
+        before = e.db.execute("SELECT COUNT(*) FROM events").fetchone()[0]
+        with self.assertRaisesRegex(ValueError, "MANDATE_NOT_FOUND"):
+            e.revoke("unregistered-mandate")
+        self.assertEqual(e.db.execute("SELECT COUNT(*) FROM events").fetchone()[0], before)
+
     def test_reject_rebinding_source(self):
         with self.assertRaises(ValueError):
             ContinuityEngine(self.path,ROOT_ID,"https://example.org/other")
