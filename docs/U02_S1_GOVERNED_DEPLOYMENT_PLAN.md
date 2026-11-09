@@ -110,3 +110,71 @@ Never run `docker system prune`, broad `docker compose down`,
 
 Until completed, `state/CURRENT_STATE.json` remains
 `active_gate=U02` and `runtime_operational=false`.
+
+## 6. S1 owner-measured CPU, memory and pressure admission (2026-11-09)
+
+This is a **point-in-time owner-supplied observation**, not a continuously
+monitored SLA, hosted deployment evidence, or permission grant.
+
+- Two reported CPUs; 15-minute load average 1.30. Instantaneous CPU load
+  varied: this does not prove reserve capacity under a building workload.
+- RAM 1.9 GiB and **763 MiB available** at the latest `free -h` reading.
+  Swap used ~877 MiB of 1.9 GiB; already-used swap does not itself prove
+  active swap churn. On four sequential `vmstat` interval samples,
+  both `si` and `so` were zero.
+- Linux memory pressure `some avg10=0.42, avg60=0.11, avg300=0.02`:
+  slight measured partial memory stalls. Full pressure `avg10=0`,
+  `avg60=0`, `avg300=0`: no sustained all-workload memory stall
+  during these measured windows. This does **not** preclude future OOM.
+- The established MCP Docker container consumed ~144.6 MiB RAM during
+  its earlier sample. Other unrelated Linux and Plesk services use RAM
+  independently; container memory usage is not total host process usage.
+- Disk 18G free, inode occupancy 51%, Docker 24.0.7 and Compose v2.29.7
+  observed in user-run read-only host commands. Candidate `/opt/uaes`
+  appeared absent and container 8080 not listening at that instant;
+  revalidate both immediately before any actual host write.
+- Ubuntu 20.04.6 LTS reported. Verify actual security-support/Ubuntu Pro
+  entitlement, live kernel support and available security patches before
+  allowing persistent privileged agents. Do **not** run an OS upgrade
+  or reboot from the UAES onboarding procedure.
+
+### Proposed *staging-only* envelope
+
+An additive candidate overlay is `compose.s1-staging.yaml` layered
+over the existing `compose.yaml`, **only** under the independent Compose
+project name `uaes-staging`. It caps **worker** memory at 256 MiB,
+total memory-plus-swap at 256 MiB, CPU at 0.35 core and PIDs at 64,
+drops Linux capabilities and bounds local container logs. The base
+Compose file still enforces a valid existing UAES agent/mandate and
+a dedicated Compose-project data volume. No host TCP port is published.
+
+These numbers are **engineering trial settings, not accepted production
+resource entitlements**. Validate configuration statically and check
+post-start memory, health, CPU, OOM, persistent storage and other app
+health before considering them usable. Resource accounting does not
+include all host/Docker build overhead; prefer building release images
+away from the shared S1 host and deploying a verified immutable digest.
+
+Staging **must remain stopped** until a separately authorized UAES
+host executor exists, credentials and permissions are scoped, the
+initial real agent/mandate state is admitted and encrypted backup
+destination with restore drill is ready. Do not execute the Compose
+`up` command from an MCP-target-only tool or a generic root shell
+without the corresponding host-change admission.
+
+The immediate executable operation after approval is **configuration
+validation only** (not container start), from the checked-out,
+SHA-verified UAES source:
+
+```bash
+# Provide only existing authorized identifiers to runtime, never
+# the placeholder schema values used by tests.
+docker compose -p uaes-staging \
+  -f compose.yaml -f compose.s1-staging.yaml config --quiet
+```
+
+The command needs valid `UAES_AGENT_ID` and `UAES_MANDATE_ID`
+environment variables for interpolation; if these are not yet set,
+do not invent them or treat successful parsing as authorization.
+
+**U02 status: IN PROGRESS / NOT DEPLOYED.**

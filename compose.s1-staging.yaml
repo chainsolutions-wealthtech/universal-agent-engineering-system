@@ -1,0 +1,18 @@
+# S1 candidate limits for the existing UAES worker, applied only as a Compose overlay.
+# This file does not deploy or authorize a worker. Invoke with a dedicated
+# project name: docker compose -p uaes-staging -f compose.yaml -f compose.s1-staging.yaml config
+# Memory 256 MiB and CPU 0.35 are provisional host-admission ceilings,
+# not a guarantee of runtime readiness or a permission grant.
+services:
+  uaes-worker:
+    cpus: "0.35"
+    mem_limit: 256m
+    memswap_limit: 256m
+    pids_limit: 64
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
