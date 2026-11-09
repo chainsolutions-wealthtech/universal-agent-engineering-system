@@ -130,6 +130,48 @@ class ContinuityTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.engine.bind_existing("agent","invented-agent")
 
+    def test_checkpoint_link_rejects_missing_or_foreign_root(self):
+        e = self.engine
+        with self.assertRaises(ValueError):
+            e.bind_existing("checkpoint", 987654321)
+        another = ContinuityEngine(self.path, "independent-root",
+                                   "https://github.com/chainsolutions-wealthtech/universal-agent-engineering-system/issues/6#independent")
+        try:
+            foreign_checkpoint = another.checkpoint()["checkpoint_id"]
+        finally:
+            another.db.close()
+        with self.assertRaises(ValueError):
+            e.bind_existing("checkpoint", foreign_checkpoint)
+        self.assertEqual(e.db.execute(
+            "SELECT COUNT(*) FROM continuity_links WHERE kind='checkpoint'").fetchone()[0], 0)
+
+    def test_revoke_event_link_failure_rolls_back_revocation(self):
+        e = self.engine
+        agent = e.agent("revocation-test-agent")
+        mandate = e.mandate(agent, "revocation-project", "analyze")
+        before = e.db.execute("SELECT COUNT(*) FROM events").fetchone()[0]
+        original = e.link
+        def fail(kind, object_id):
+            if kind == "event":
+                raise RuntimeError("simulated event-link failure")
+            return original(kind, object_id)
+        e.link = fail
+        try:
+            with self.assertRaises(RuntimeError):
+                e.revoke(mandate)
+        finally:
+            e.link = original
+        self.assertEqual(e.db.execute(
+            "SELECT revoked FROM mandates WHERE id=?", (mandate,)).fetchone()[0], 0)
+        self.assertEqual(e.db.execute("SELECT COUNT(*) FROM events").fetchone()[0], before)
+        e.revoke(mandate)
+        self.assertEqual(e.db.execute(
+            "SELECT revoked FROM mandates WHERE id=?", (mandate,)).fetchone()[0], 1)
+        self.assertEqual(e.db.execute(
+            """SELECT COUNT(*) FROM continuity_links l JOIN events v ON v.seq=l.object_id
+               WHERE l.kind='event' AND v.kind='mandate.revoked' AND v.subject=?""",
+            (mandate,)).fetchone()[0], 1)
+
     def test_reject_rebinding_source(self):
         with self.assertRaises(ValueError):
             ContinuityEngine(self.path,ROOT_ID,"https://example.org/other")
