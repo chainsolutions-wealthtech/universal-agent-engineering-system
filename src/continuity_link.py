@@ -113,6 +113,9 @@ class ContinuityEngine(Engine):
         """Keep mandate revocation and its correlated event atomic."""
         self.db.execute("BEGIN IMMEDIATE")
         try:
+            # Do not emit an apparent revocation for a nonexistent mandate.
+            if self.db.execute("SELECT 1 FROM mandates WHERE id=?", (mid,)).fetchone() is None:
+                raise ValueError("MANDATE_NOT_FOUND")
             super().revoke(mid)
             self.db.execute("COMMIT")
         except BaseException:
@@ -179,10 +182,31 @@ class ContinuityEngine(Engine):
                     effects.append({"id":object_id,"state":row[0] if row else "MISSING"})
         except sqlite3.OperationalError:
             effects.append({"state":"UNAVAILABLE"})
+        verified_checkpoint = None
+        if last:
+            try:
+                snapshot = json.loads(last[2])
+            except (TypeError, ValueError) as exc:
+                raise ValueError("CHECKPOINT_PROVENANCE_MISMATCH") from exc
+            max_event = self.db.execute(
+                "SELECT COALESCE(MAX(seq),0) FROM events").fetchone()[0]
+            if (not isinstance(snapshot, dict)
+                    or snapshot.get("continuity_id") != self.continuity_id
+                    or type(snapshot.get("event_watermark")) is not int
+                    or type(last[1]) is not int
+                    or snapshot["event_watermark"] != last[1]
+                    or last[1] < 0 or last[1] > max_event
+                    or not isinstance(snapshot.get("core"), dict)):
+                raise ValueError("CHECKPOINT_PROVENANCE_MISMATCH")
+            if not self.db.execute(
+                    """SELECT 1 FROM continuity_links WHERE continuity_id=?
+                       AND kind='checkpoint' AND object_id=?""",
+                    (self.continuity_id, str(last[0]))).fetchone():
+                raise ValueError("CHECKPOINT_LINK_MISSING")
+            verified_checkpoint = {"id":last[0], "event_watermark":last[1],
+                                   "snapshot":snapshot}
         return {"continuity_id":self.continuity_id,"source":root[0],
                 "links":[{"kind":k,"object_id":o} for k,o in links],
                 "tasks":tasks,"effects":effects,
-                "checkpoint":None if not last else
-                    {"id":last[0],"event_watermark":last[1],
-                     "snapshot":json.loads(last[2])},
+                "checkpoint":verified_checkpoint,
                 "next_action":"RECONCILE_PROVIDER_AND_AUTHORIZATION_BEFORE_EXECUTION"}
