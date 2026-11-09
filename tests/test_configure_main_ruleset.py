@@ -44,6 +44,25 @@ class RulesetTests(unittest.TestCase):
         self.assertEqual(reviews["parameters"]["required_approving_review_count"], 0)
         self.assertFalse(reviews["parameters"]["require_code_owner_review"])
 
+    def test_import_recipe_matches_canonical_ruleset_without_dropping_rights(self):
+        # The optional native GitHub import JSON must not drift from the
+        # tested installer policy, especially the three 'always' actors.
+        import json
+        from pathlib import Path
+        root = Path(__file__).resolve().parents[1]
+        fixture = json.loads(
+            (root / "docs/U00_MAIN_RULESET_IMPORT.json").read_text(encoding="utf-8"))
+        candidate = [
+            {"actor_type": "User", "actor_id": 94637590, "bypass_mode": "always"},
+            {"actor_type": "User", "actor_id": 270385782, "bypass_mode": "always"},
+            {"actor_type": "Integration", "actor_id": 5417646, "bypass_mode": "always"},
+        ]
+        self.assertEqual(fixture, proposed_ruleset(candidate))
+        self.assertEqual(len(fixture["bypass_actors"]), 3)
+        self.assertEqual(fixture["conditions"]["ref_name"]["include"],
+                         ["refs/heads/main"])
+        self.assertEqual(fixture["enforcement"], "active")
+
     def test_provider_must_attest_exact_bypass_actor_count_and_identity(self):
         details = {"enforcement": "active", "bypass_actors": [dict(x) for x in ACTORS]}
         self.assertTrue(verify_effective_bypass(details, ACTORS))
