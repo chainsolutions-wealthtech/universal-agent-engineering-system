@@ -93,7 +93,9 @@ class BypassActorPolicyTests(unittest.TestCase):
                     "/repos/chainsolutions-wealthtech/universal-agent-engineering-system/collaborators/Patricked-code/permission": {"permission": "admin"},
                     "/apps/uaes-test-app": {"id": 123456, "slug": "uaes-test-app"},
                     "/user/installations?per_page=100": {"total_count": 1, "installations": [
-                        {"id": 9988, "app_id": 123456, "account": {
+                        {"id": 9988, "app_id": 123456,
+                         "permissions": {"contents": "write", "pull_requests": "write"},
+                         "account": {
                             "login": "chainsolutions-wealthtech", "id": 299685687}}]},
                     "/user/installations/9988/repositories?per_page=100": {
                         "total_count": 1, "repositories": [{"full_name":
@@ -103,6 +105,18 @@ class BypassActorPolicyTests(unittest.TestCase):
                 return self.responses[path]
         client = Client()
         self.assertTrue(verify_bypass_principals(client, self.data))
+        # An installation is not an execution-capability attestation.
+        # Both grants are required before treating it as the proposed
+        # organization-side engineering principal.
+        install = client.responses["/user/installations?per_page=100"]["installations"][0]
+        install["permissions"]["contents"] = "read"
+        with self.assertRaisesRegex(BypassPolicyError, "APP_REQUIRED_WRITE_GRANTS_MISSING"):
+            verify_bypass_principals(client, self.data)
+        install["permissions"]["contents"] = "write"
+        install.pop("permissions")
+        with self.assertRaisesRegex(BypassPolicyError, "APP_GRANTED_PERMISSIONS_UNVERIFIED"):
+            verify_bypass_principals(client, self.data)
+        install["permissions"] = {"contents": "write", "pull_requests": "write"}
         client.responses["/apps/uaes-test-app"] = {"id": 123457, "slug": "uaes-test-app"}
         with self.assertRaisesRegex(BypassPolicyError, "GITHUB_APP_IDENTITY_UNVERIFIED"):
             verify_bypass_principals(client, self.data)
