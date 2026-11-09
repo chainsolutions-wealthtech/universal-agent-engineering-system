@@ -1,0 +1,82 @@
+{
+  "name": "UAES main governed automation D007",
+  "target": "branch",
+  "enforcement": "active",
+  "bypass_actors": [
+    {
+      "actor_type": "User",
+      "actor_id": 94637590,
+      "bypass_mode": "always"
+    },
+    {
+      "actor_type": "User",
+      "actor_id": 270385782,
+      "bypass_mode": "always"
+    },
+    {
+      "actor_type": "Integration",
+      "actor_id": 5417646,
+      "bypass_mode": "always"
+    }
+  ],
+  "conditions": {
+    "ref_name": {
+      "include": [
+        "refs/heads/main"
+      ],
+      "exclude": []
+    }
+  },
+  "rules": [
+    {
+      "type": "deletion"
+    },
+    {
+      "type": "non_fast_forward"
+    },
+    {
+      "type": "pull_request",
+      "parameters": {
+        "dismiss_stale_reviews_on_push": true,
+        "require_code_owner_review": false,
+        "require_last_push_approval": false,
+        "required_approving_review_count": 0,
+        "required_review_thread_resolution": true,
+        "allowed_merge_methods": [
+          "merge",
+          "squash",
+          "rebase"
+        ],
+        "required_reviewers": []
+      }
+    },
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": true,
+        "required_status_checks": [
+          {
+            "context": "core-tests",
+            "integration_id": 15368
+          },
+          {
+            "context": "documentary-contracts",
+            "integration_id": 15368
+          },
+          {
+            "context": "container-smoke",
+            "integration_id": 15368
+          },
+          {
+            "context": "automated-review",
+            "integration_id": 15368
+          },
+          {
+            "context": "determine-next",
+            "integration_id": 15368
+          }
+        ]
+      }
+    }
+  ]
+}
