@@ -7,6 +7,18 @@
 > Project: `chainsolutions-wealthtech/universal-agent-engineering-system`.
 > Bootstrap source: PR #1, `bootstrap/independent-foundation`.
 
+## Provider-verified U00 → U01 acceptance — 2026-11-09
+
+This is an **additive, dated execution receipt**; the 2026-11-06 baseline
+below is historical and must not override the present source of truth
+`state/CURRENT_STATE.json`.
+
+- **U00 COMPLETE:** GitHub native ruleset [26883048](https://github.com/chainsolutions-wealthtech/universal-agent-engineering-system/settings/rules/26883048), `UAES main governed automation D007`, is `active` for `refs/heads/main`; GitHub returns `main.protected=true`. GitHub readback confirms zero mandatory approvals, no required code-owner or last-push reviewer, strict current-base five required GitHub Actions job checks (App 15368), deletion and non-fast-forward rules, and the exact three `always` bypass principals: `User/94637590`, `User/270385782`, `Integration/5417646`.
+- **U01 bootstrap integrated:** PR [#1](https://github.com/chainsolutions-wealthtech/universal-agent-engineering-system/pull/1), validated on head `c6611500e23a13c77db87d8958c43f412a742979`, merged as `c5172a7e85eed43732687bd63c2e5a290d4c97be`.
+- **U01 continuity supplement integrated:** PR [#7](https://github.com/chainsolutions-wealthtech/universal-agent-engineering-system/pull/7) reconciled non-destructively with the integrated main via two-parent commit `404b19acd5c160e8bf44439cfc4a24e03c45a24d`; no conflict across full Git trees, no forced updates; five latest checks passed and 106 Python tests succeeded. Merged as `91b6e5fb674c30a29ca07b7dc024db7671db9ade`.
+- **Current active gate U02:** no isolated hosted runtime, actual uptime, backup/restore, staging worker deployment or operational token broker was verified. The App appears as the `Integration/5417646` bypass actor in the native ruleset; this **does not establish** its complete installation grant matrix or ability to issue installation tokens. U03–U09 remain subject to actual provider/host evidence.
+- **NEXT_ACTION:** provision authorized isolated UAES staging, attest persistent volumes, backups and recovery, startup and runtime health at a pinned commit/digest; then read back actual App installation permissions, implement secure token broker and proceed through U04–U09. U10 is optional and U11 requires separate target-repository admission.
+
 ## Immutable operating rules
 
 - GitHub `main`, provider-required approvals (if any), and required checks are **provider-enforced** boundaries;
